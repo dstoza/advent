@@ -4,10 +4,9 @@ fn checksum<I>(stream: I) -> i32
 where
     I: Iterator<Item = i32>,
 {
-    let min_max = stream.fold(
-        (i32::max_value(), i32::min_value()),
-        |acc, x| (std::cmp::min(acc.0, x), std::cmp::max(acc.1, x)),
-    );
+    let min_max = stream.fold((i32::max_value(), i32::min_value()), |acc, x| {
+        (std::cmp::min(acc.0, x), std::cmp::max(acc.1, x))
+    });
     min_max.1 - min_max.0
 }
 
