@@ -4,23 +4,43 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-fn sum_product2(sorted: &[i32], target: i32) -> i32 {
+fn sum_product2(sorted: &[i32], target: i32) -> Option<i32> {
     let mut candidate_index = sorted.len() - 1;
     for number in sorted {
         while number + sorted[candidate_index] > target {
+            if candidate_index == 0 {
+                return None;
+            }
+
             candidate_index -= 1;
         }
 
         if number + sorted[candidate_index] == target {
-            return number * sorted[candidate_index];
+            return Some(number * sorted[candidate_index]);
         }
     }
-    -1
+
+    None
+}
+
+fn sum_product3(sorted: &[i32], target: i32) -> Option<i32> {
+    let mut end = sorted.len() - 1;
+    for number in sorted {
+        while number + sorted[end] > target {
+            end -= 1;
+        }
+
+        if let Some(product2) = sum_product2(&sorted[0..end], target - number) {
+            return Some(product2 * number);
+        }
+    }
+
+    None
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    if args.len() != 3 {
         return;
     }
 
@@ -45,6 +65,16 @@ fn main() {
         line.clear();
     }
 
+    let mode = &args[2];
     array.sort();
-    println!("Result: {}", sum_product2(&array, 2020));
+    let result = match mode.as_str() {
+        "2" => sum_product2(&array, 2020),
+        "3" => sum_product3(&array, 2020),
+        _ => {
+            println!("Expected mode '2' or '3'");
+            None
+        }
+    };
+    
+    println!("Result: {}", result.expect("Failed to find sum product"));
 }
