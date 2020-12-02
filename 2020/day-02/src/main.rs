@@ -20,16 +20,50 @@ struct Policy {
     character: char,
 }
 
+impl Policy {
+    fn allows(&self, password: &str) -> bool {
+        let mut count = 0usize;
+        for c in password.chars() {
+            if c == self.character {
+                count += 1;
+            }
+            if count > self.max {
+                return false;
+            }
+        }
+        count >= self.min
+    }
+}
+
 fn password_is_valid(line: &str) -> bool {
-    println!("checking {}", line.trim());
     let captures = PARSE_LINE
         .captures(&line)
         .expect(format!("Failed to match [{}]", &line).as_str());
-    println!("min: {}", captures.get(1).expect("Failed to get min").as_str());
-    println!("max: {}", captures.get(2).expect("Failed to get max").as_str());
-    println!("char: {}", captures.get(3).expect("Failed to get char").as_str());
-    println!("password: {}", captures.get(4).expect("Failed to get password").as_str());
-    false
+
+    let policy = Policy {
+        min: captures
+            .get(1)
+            .expect("Failed to parse min")
+            .as_str()
+            .parse::<usize>()
+            .expect("Failed to parse min as usize"),
+        max: captures
+            .get(2)
+            .expect("Failed to parse max")
+            .as_str()
+            .parse::<usize>()
+            .expect("Failed to parse max as usize"),
+        character: captures
+            .get(3)
+            .expect("Failed to parse character")
+            .as_str()
+            .chars()
+            .nth(0)
+            .expect("Failed to find character"),
+    };
+    let password = captures.get(4).expect("Failed to parse password").as_str();
+
+    policy.allows(password)
 }
 
 fn main() {
