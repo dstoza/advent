@@ -52,13 +52,14 @@ fn main() {
     let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
     let mut reader = BufReader::new(file);
 
-    let mut line = String::new();
     let mut followers = Vec::new();
     followers.push(PathFollower::new(1, 1));
     followers.push(PathFollower::new(3, 1));
     followers.push(PathFollower::new(5, 1));
     followers.push(PathFollower::new(7, 1));
     followers.push(PathFollower::new(1, 2));
+
+    let mut line = String::new();
     loop {
         let bytes = reader.read_line(&mut line).expect("Failed to read line");
         if bytes == 0 {
@@ -73,9 +74,11 @@ fn main() {
         line.clear();
     }
 
-    let mut product = 1usize;
-    for follower in &followers {
-        product *= follower.get_tree_count();
-    }
-    println!("Follower product: {}", product);
+    println!(
+        "Follower product: {}",
+        followers
+            .drain(..)
+            .map(|follower| follower.get_tree_count())
+            .product::<usize>()
+    );
 }
