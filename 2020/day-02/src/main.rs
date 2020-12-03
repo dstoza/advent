@@ -7,20 +7,106 @@ use std::{
 #[macro_use]
 extern crate lazy_static;
 
-use regex::Regex;
+use regex::{Captures, Regex};
 
 lazy_static! {
     static ref PARSE_LINE: Regex =
         Regex::new(r"(\d+)-(\d+) (.): (.*)").expect("Failed to compile regular expression");
 }
 
-struct Policy {
+#[derive(Clone, Copy)]
+enum PolicyType {
+    Range,
+    Position,
+}
+
+trait Policy {
+    fn allows(&self, password: &str) -> bool;
+}
+
+struct PositionPolicy {
+    first: usize,
+    second: usize,
+    character: char,
+}
+
+impl PositionPolicy {
+    fn new(captures: &Captures) -> Self {
+        Self {
+            first: captures
+                .get(1)
+                .expect("Failed to parse first")
+                .as_str()
+                .parse::<usize>()
+                .expect("Failed to parse first as usize"),
+            second: captures
+                .get(2)
+                .expect("Failed to parse second")
+                .as_str()
+                .parse::<usize>()
+                .expect("Failed to parse second as usize"),
+            character: captures
+                .get(3)
+                .expect("Failed to parse character")
+                .as_str()
+                .chars()
+                .nth(0)
+                .expect("Failed to find character"),
+        }
+    }
+}
+
+impl Policy for PositionPolicy {
+    fn allows(&self, password: &str) -> bool {
+        let first_matches = password
+            .chars()
+            .nth(self.first - 1)
+            .expect("Failed to find first character")
+            == self.character;
+
+        let second_matches = password
+            .chars()
+            .nth(self.second - 1)
+            .expect("Failed to find second character")
+            == self.character;
+
+        first_matches ^ second_matches
+    }
+}
+
+struct RangePolicy {
     min: usize,
     max: usize,
     character: char,
 }
 
-impl Policy {
+impl RangePolicy {
+    fn new(captures: &Captures) -> Self {
+        Self {
+            min: captures
+                .get(1)
+                .expect("Failed to parse min")
+                .as_str()
+                .parse::<usize>()
+                .expect("Failed to parse min as usize"),
+            max: captures
+                .get(2)
+                .expect("Failed to parse max")
+                .as_str()
+                .parse::<usize>()
+                .expect("Failed to parse max as usize"),
+            character: captures
+                .get(3)
+                .expect("Failed to parse character")
+                .as_str()
+                .chars()
+                .nth(0)
+                .expect("Failed to find character"),
+        }
+    }
+}
+
+impl Policy for RangePolicy {
     fn allows(&self, password: &str) -> bool {
         let mut count = 0usize;
         for c in password.chars() {
@@ -35,31 +121,16 @@ impl Policy {
     }
 }
 
-fn password_is_valid(line: &str) -> bool {
+fn password_is_valid(line: &str, policy_type: PolicyType) -> bool {
     let captures = PARSE_LINE
         .captures(&line)
         .expect(format!("Failed to match [{}]", &line).as_str());
 
-    let policy = Policy {
-        min: captures
-            .get(1)
-            .expect("Failed to parse min")
-            .as_str()
-            .parse::<usize>()
-            .expect("Failed to parse min as usize"),
-        max: captures
-            .get(2)
-            .expect("Failed to parse max")
-            .as_str()
-            .parse::<usize>()
-            .expect("Failed to parse max as usize"),
-        character: captures
-            .get(3)
-            .expect("Failed to parse character")
-            .as_str()
-            .chars()
-            .nth(0)
-            .expect("Failed to find character"),
+    let policy = {
+        match policy_type {
+            PolicyType::Position => Box::new(PositionPolicy::new(&captures)) as Box<dyn Policy>,
+            PolicyType::Range => Box::new(RangePolicy::new(&captures)) as Box<dyn Policy>,
+        }
     };
     let password = captures.get(4).expect("Failed to parse password").as_str();
 
@@ -68,9 +139,15 @@ fn password_is_valid(line: &str) -> bool {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
+    if args.len() != 3 {
         return;
     }
+
+    let policy_type = match args[2].as_str() {
+        "position" => PolicyType::Position,
+        "range" => PolicyType::Range,
+        _ => panic!("Unexpected policy type {}", args[2].as_str()),
+    };
 
     let filename = &args[1];
     let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
@@ -84,7 +161,7 @@ fn main() {
             break;
         }
 
-        if password_is_valid(&line) {
+        if password_is_valid(&line, policy_type) {
             valid_password_count += 1;
         }
 
