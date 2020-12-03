@@ -27,7 +27,7 @@ trait Policy {
 struct PositionPolicy {
     first: usize,
     second: usize,
-    character: char,
+    character: u8,
 }
 
 impl PositionPolicy {
@@ -49,27 +49,15 @@ impl PositionPolicy {
                 .get(3)
                 .expect("Failed to parse character")
                 .as_str()
-                .chars()
-                .nth(0)
-                .expect("Failed to find character"),
+                .as_bytes()[0],
         }
     }
 }
 
 impl Policy for PositionPolicy {
     fn allows(&self, password: &str) -> bool {
-        let first_matches = password
-            .chars()
-            .nth(self.first - 1)
-            .expect("Failed to find first character")
-            == self.character;
-
-        let second_matches = password
-            .chars()
-            .nth(self.second - 1)
-            .expect("Failed to find second character")
-            == self.character;
-
+        let first_matches = password.as_bytes()[self.first - 1] == self.character;
+        let second_matches = password.as_bytes()[self.second - 1] == self.character;
         first_matches ^ second_matches
     }
 }
@@ -77,7 +65,7 @@ impl Policy for PositionPolicy {
 struct RangePolicy {
     min: usize,
     max: usize,
-    character: char,
+    character: u8,
 }
 
 impl RangePolicy {
@@ -99,9 +87,7 @@ impl RangePolicy {
                 .get(3)
                 .expect("Failed to parse character")
                 .as_str()
-                .chars()
-                .nth(0)
-                .expect("Failed to find character"),
+                .as_bytes()[0],
         }
     }
 }
@@ -109,8 +95,8 @@ impl RangePolicy {
 impl Policy for RangePolicy {
     fn allows(&self, password: &str) -> bool {
         let mut count = 0usize;
-        for c in password.chars() {
-            if c == self.character {
+        for c in password.as_bytes() {
+            if *c == self.character {
                 count += 1;
             }
             if count > self.max {
