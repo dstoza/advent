@@ -9,7 +9,7 @@ struct PathFollower {
     down: usize,
     column: usize,
     row: usize,
-    tree_count: usize
+    tree_count: usize,
 }
 
 impl PathFollower {
@@ -26,7 +26,7 @@ impl PathFollower {
     fn add_line(&mut self, line: &[u8]) {
         if self.row % self.down != 0 {
             self.row += 1;
-            return
+            return;
         }
 
         if line[self.column % line.len()] == b'#' {
@@ -66,7 +66,7 @@ fn main() {
         }
 
         let trimmed = line.trim().as_bytes();
-        for follower in & mut followers {
+        for follower in &mut followers {
             follower.add_line(trimmed);
         }
 
@@ -75,7 +75,7 @@ fn main() {
 
     let mut product = 1usize;
     for follower in &followers {
-        product *= follower.get_tree_count(); 
+        product *= follower.get_tree_count();
     }
     println!("Follower product: {}", product);
 }
