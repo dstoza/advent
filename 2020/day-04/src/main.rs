@@ -32,16 +32,6 @@ fn number_is_valid(value: &str, min: i32, max: i32) -> bool {
     }
 }
 
-fn hex_bytes_are_valid(value: &[u8]) -> bool {
-    for c in value {
-        let valid = *c >= b'0' && *c <= b'9' || *c >= b'a' && *c <= b'f';
-        if !valid {
-            return false;
-        }
-    }
-    true
-}
-
 impl PassportParser {
     fn new(validate_values: bool) -> Self {
         Self {
@@ -106,7 +96,11 @@ impl PassportParser {
 
         let bytes = value.as_bytes();
         if !self.validate_values
-            || bytes.len() == 7 && bytes[0] == b'#' && hex_bytes_are_valid(&bytes[1..])
+            || bytes.len() == 7
+                && bytes[0] == b'#'
+                && bytes[1..]
+                    .into_iter()
+                    .all(|c| *c >= b'0' && *c <= b'9' || *c >= b'a' && *c <= b'f')
         {
             Fields::HAIR_COLOR
         } else {
@@ -131,16 +125,11 @@ impl PassportParser {
         }
 
         let bytes = value.as_bytes();
-        if bytes.len() != 9 {
-            return Fields::empty();
+        if bytes.len() == 9 && bytes.into_iter().all(|b| *b >= b'0' && *b <= b'9') {
+            Fields::PASSPORT_ID
+        } else {
+            Fields::empty()
         }
-        for b in bytes {
-            if *b < b'0' || *b > b'9' {
-                return Fields::empty();
-            }
-        }
-
-        Fields::PASSPORT_ID
     }
 
     fn parse_fields(&self, line: &str) -> Fields {
