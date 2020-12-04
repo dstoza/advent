@@ -90,10 +90,6 @@ impl PassportParser {
     }
 
     fn hair_color_if_valid(&self, value: &str) -> Fields {
-        if !self.validate_values {
-            return Fields::HAIR_COLOR;
-        }
-
         let bytes = value.as_bytes();
         if !self.validate_values
             || bytes.len() == 7
@@ -120,12 +116,10 @@ impl PassportParser {
     }
 
     fn passport_id_if_valid(&self, value: &str) -> Fields {
-        if !self.validate_values {
-            return Fields::PASSPORT_ID;
-        }
-
         let bytes = value.as_bytes();
-        if bytes.len() == 9 && bytes.into_iter().all(|b| *b >= b'0' && *b <= b'9') {
+        if !self.validate_values
+            || bytes.len() == 9 && bytes.into_iter().all(|b| *b >= b'0' && *b <= b'9')
+        {
             Fields::PASSPORT_ID
         } else {
             Fields::empty()
@@ -169,10 +163,6 @@ impl PassportParser {
     }
 }
 
-fn is_valid(fields: Fields) -> bool {
-    fields & Fields::REQUIRED == Fields::REQUIRED
-}
-
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 || args.len() > 3 {
@@ -195,7 +185,7 @@ fn main() {
         }
 
         if let Some(fields) = parser.add_line(&line) {
-            if is_valid(fields) {
+            if fields == Fields::REQUIRED {
                 valid_passports += 1;
             }
         }
@@ -203,7 +193,7 @@ fn main() {
         line.clear();
     }
 
-    if is_valid(parser.add_line("").expect("Failed to find last record")) {
+    if parser.add_line("").expect("Failed to find last record") == Fields::REQUIRED {
         valid_passports += 1;
     }
 
