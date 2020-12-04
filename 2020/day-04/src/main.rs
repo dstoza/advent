@@ -65,24 +65,22 @@ impl PassportParser {
     }
 
     fn height_if_valid(&self, value: &str) -> Fields {
-        if !self.validate_values {
-            return Fields::HEIGHT;
-        }
-
         let bytes = value.as_bytes();
-        if match &bytes[bytes.len() - 2..] {
-            b"cm" => number_is_valid(
-                value.strip_suffix("cm").expect("Failed to strip cm suffix"),
-                150,
-                193,
-            ),
-            b"in" => number_is_valid(
-                value.strip_suffix("in").expect("Failed to strip in suffix"),
-                59,
-                76,
-            ),
-            _ => false,
-        } {
+        if !self.validate_values
+            || match &bytes[bytes.len() - 2..] {
+                b"cm" => number_is_valid(
+                    value.strip_suffix("cm").expect("Failed to strip cm suffix"),
+                    150,
+                    193,
+                ),
+                b"in" => number_is_valid(
+                    value.strip_suffix("in").expect("Failed to strip in suffix"),
+                    59,
+                    76,
+                ),
+                _ => false,
+            }
+        {
             Fields::HEIGHT
         } else {
             Fields::empty()
