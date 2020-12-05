@@ -63,6 +63,7 @@ fn main() {
     for seat in occupied.into_iter() {
         if !occupied.contains(seat + 1) && occupied.contains(seat + 2) {
             println!("My seat: {}", seat + 1);
+            break;
         }
     }
 }
