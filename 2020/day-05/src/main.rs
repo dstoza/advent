@@ -1,4 +1,9 @@
-use std::{env, fs::File, io::{BufRead, BufReader}, cmp::max};
+use std::{
+    cmp::max,
+    env,
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 use bit_set::BitSet;
 
