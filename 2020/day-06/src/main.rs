@@ -43,27 +43,27 @@ impl QuestionCounter {
     }
 
     fn add_line(&mut self, line: &str) -> Option<Counts> {
-        if line.trim().is_empty() {
-            let any_person = self.any_person.count_ones();
-            let all_people = self
-                .individuals
-                .iter()
-                .fold(self.individuals[0], |common, individual| {
-                    common & individual
-                })
-                .count_ones();
-
-            self.any_person = 0;
-            self.individuals.clear();
-
-            return Some(Counts {
-                any_person,
-                all_people,
-            });
+        if !line.trim().is_empty() {
+            self.parse_questions(line);
+            return None;
         }
 
-        self.parse_questions(line);
-        None
+        let any_person = self.any_person.count_ones();
+        let all_people = self
+            .individuals
+            .iter()
+            .fold(self.individuals[0], |common, individual| {
+                common & individual
+            })
+            .count_ones();
+
+        self.any_person = 0;
+        self.individuals.clear();
+
+        Some(Counts {
+            any_person,
+            all_people,
+        })
     }
 }
 
