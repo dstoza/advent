@@ -7,7 +7,7 @@ use std::{
 
 struct QuestionCounter {
     any_person: u32,
-    individuals: Vec<u32>,
+    all_people: u32,
 }
 
 struct Counts {
@@ -26,7 +26,7 @@ impl QuestionCounter {
     fn new() -> Self {
         Self {
             any_person: 0u32,
-            individuals: Vec::new(),
+            all_people: u32::MAX,
         }
     }
 
@@ -39,7 +39,7 @@ impl QuestionCounter {
         }
 
         self.any_person |= individual;
-        self.individuals.push(individual);
+        self.all_people &= individual;
     }
 
     fn add_line(&mut self, line: &str) -> Option<Counts> {
@@ -48,22 +48,14 @@ impl QuestionCounter {
             return None;
         }
 
-        let any_person = self.any_person.count_ones();
-        let all_people = self
-            .individuals
-            .iter()
-            .fold(self.individuals[0], |common, individual| {
-                common & individual
-            })
-            .count_ones();
+        let counts = Some(Counts {
+            any_person: self.any_person.count_ones(),
+            all_people: self.all_people.count_ones(),
+        });
 
-        self.any_person = 0;
-        self.individuals.clear();
+        *self = Self::new();
 
-        Some(Counts {
-            any_person,
-            all_people,
-        })
+        counts
     }
 }
 
