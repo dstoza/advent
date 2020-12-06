@@ -4,6 +4,7 @@ use std::{
     io::{BufRead, BufReader},
     ops::AddAssign,
 };
+
 struct QuestionCounter {
     any_person: u32,
     individuals: Vec<u32>,
