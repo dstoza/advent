@@ -6,17 +6,17 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-struct Container {
+struct Bag {
     name: String,
     count: i32,
 }
 
-struct ContainerTracker {
+struct BagTracker {
     held_by: HashMap<String, Vec<String>>,
-    holds: HashMap<String, Vec<Container>>,
+    holds: HashMap<String, Vec<Bag>>,
 }
 
-impl ContainerTracker {
+impl BagTracker {
     fn new() -> Self {
         Self {
             held_by: HashMap::new(),
@@ -48,7 +48,7 @@ impl ContainerTracker {
                     return None;
                 }
 
-                Some(Container {
+                Some(Bag {
                     name: String::from(&description[2..]),
                     count: description[0..1]
                         .parse()
@@ -92,7 +92,7 @@ impl ContainerTracker {
 
     fn compute_containee_count(
         &self,
-        container: &Container,
+        container: &Bag,
         containee_counts: &mut HashMap<String, i32>,
     ) -> i32 {
         if let Some(count) = containee_counts.get(&container.name) {
@@ -119,7 +119,7 @@ fn main() {
     let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
     let mut reader = BufReader::new(file);
 
-    let mut tracker = ContainerTracker::new();
+    let mut tracker = BagTracker::new();
 
     let mut line = String::new();
     loop {
@@ -142,7 +142,7 @@ fn main() {
     println!(
         "Shiny gold contains: {}",
         tracker.compute_containee_count(
-            &Container {
+            &Bag {
                 name: String::from("shiny gold"),
                 count: 1,
             },
