@@ -11,12 +11,12 @@ struct Container {
     count: i32,
 }
 
-struct ShinyGoldTracker {
+struct ContainerTracker {
     held_by: HashMap<String, Vec<String>>,
     holds: HashMap<String, Vec<Container>>,
 }
 
-impl ShinyGoldTracker {
+impl ContainerTracker {
     fn new() -> Self {
         Self {
             held_by: HashMap::new(),
@@ -119,7 +119,7 @@ fn main() {
     let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
     let mut reader = BufReader::new(file);
 
-    let mut tracker = ShinyGoldTracker::new();
+    let mut tracker = ContainerTracker::new();
 
     let mut line = String::new();
     loop {
