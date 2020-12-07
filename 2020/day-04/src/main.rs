@@ -1,3 +1,5 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
     env,
     fs::File,
@@ -9,14 +11,14 @@ extern crate bitflags;
 
 bitflags! {
     struct Fields: u8 {
-        const BIRTH_YEAR = 1u8 << 0;
-        const ISSUE_YEAR = 1u8 << 1;
-        const EXPIRATION_YEAR = 1u8 << 2;
-        const HEIGHT = 1u8 << 3;
-        const HAIR_COLOR = 1u8 << 4;
-        const EYE_COLOR = 1u8 << 5;
-        const PASSPORT_ID = 1u8 << 6;
-        const REQUIRED = 0b01111111;
+        const BIRTH_YEAR = 1_u8 << 0;
+        const ISSUE_YEAR = 1_u8 << 1;
+        const EXPIRATION_YEAR = 1_u8 << 2;
+        const HEIGHT = 1_u8 << 3;
+        const HAIR_COLOR = 1_u8 << 4;
+        const EYE_COLOR = 1_u8 << 5;
+        const PASSPORT_ID = 1_u8 << 6;
+        const REQUIRED = 0b0111_1111;
     }
 }
 
@@ -93,7 +95,7 @@ impl PassportParser {
             || bytes.len() == 7
                 && bytes[0] == b'#'
                 && bytes[1..]
-                    .into_iter()
+                    .iter()
                     .all(|c| *c >= b'0' && *c <= b'9' || *c >= b'a' && *c <= b'f')
         {
             Fields::HAIR_COLOR
@@ -116,7 +118,7 @@ impl PassportParser {
     fn passport_id_if_valid(&self, value: &str) -> Fields {
         let bytes = value.as_bytes();
         if !self.validate_values
-            || bytes.len() == 9 && bytes.into_iter().all(|b| *b >= b'0' && *b <= b'9')
+            || bytes.len() == 9 && bytes.iter().all(|b| *b >= b'0' && *b <= b'9')
         {
             Fields::PASSPORT_ID
         } else {
@@ -127,13 +129,13 @@ impl PassportParser {
     fn parse_fields(&self, line: &str) -> Fields {
         let mut fields = Fields::empty();
         for token in line.trim().split_ascii_whitespace() {
-            let split: Vec<&str> = token.split(":").collect();
+            let split: Vec<&str> = token.split(':').collect();
             assert!(
                 split.len() == 2,
                 format!("Expected two fields when splitting [{}]", token)
             );
 
-            fields |= match split[0] {
+            fields |= match *split.get(0).expect("Failed to get field name from split") {
                 "byr" => self.birth_year_if_valid(split[1]),
                 "iyr" => self.issue_year_if_valid(split[1]),
                 "eyr" => self.expiration_year_if_valid(split[1]),
@@ -168,16 +170,18 @@ fn main() {
     }
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let validate_values = args.len() == 3 && args[2] == "validate";
     let mut parser = PassportParser::new(validate_values);
-    let mut valid_passports = 0usize;
+    let mut valid_passports = 0_usize;
 
     let mut line = String::new();
     loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
+        let bytes = reader
+            .read_line(&mut line)
+            .unwrap_or_else(|_| panic!("Failed to read line"));
         if bytes == 0 {
             break;
         }

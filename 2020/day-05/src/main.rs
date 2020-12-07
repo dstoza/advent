@@ -1,3 +1,5 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
     cmp::max,
     env,
@@ -43,7 +45,7 @@ fn main() {
     }
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let mut max_seat = 0;
@@ -51,7 +53,9 @@ fn main() {
 
     let mut line = String::new();
     loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
+        let bytes = reader
+            .read_line(&mut line)
+            .unwrap_or_else(|_| panic!("Failed to read line"));
         if bytes == 0 {
             break;
         }
@@ -65,7 +69,7 @@ fn main() {
     }
 
     println!("Max seat: {}", max_seat);
-    for seat in occupied.into_iter() {
+    for seat in &occupied {
         if !occupied.contains(seat + 1) && occupied.contains(seat + 2) {
             println!("My seat: {}", seat + 1);
             break;

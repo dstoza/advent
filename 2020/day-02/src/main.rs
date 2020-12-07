@@ -1,3 +1,5 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
     env,
     fs::File,
@@ -94,7 +96,7 @@ impl RangePolicy {
 
 impl Policy for RangePolicy {
     fn allows(&self, password: &str) -> bool {
-        let mut count = 0usize;
+        let mut count = 0_usize;
         for c in password.as_bytes() {
             if *c == self.character {
                 count += 1;
@@ -110,7 +112,7 @@ impl Policy for RangePolicy {
 fn password_is_valid(line: &str, policy_type: PolicyType) -> bool {
     let captures = PARSE_LINE
         .captures(&line)
-        .expect(format!("Failed to match [{}]", &line).as_str());
+        .unwrap_or_else(|| panic!("Failed to match [{}]", line));
 
     let policy = {
         match policy_type {
@@ -136,13 +138,15 @@ fn main() {
     };
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let mut line = String::new();
     let mut valid_password_count = 0;
     loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
+        let bytes = reader
+            .read_line(&mut line)
+            .unwrap_or_else(|_| panic!("Failed to read line"));
         if bytes == 0 {
             break;
         }

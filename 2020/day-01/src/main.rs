@@ -1,3 +1,5 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
     env,
     fs::File,
@@ -45,7 +47,7 @@ fn main() {
     }
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let mut line = String::new();
@@ -59,7 +61,7 @@ fn main() {
         let integer = line
             .trim()
             .parse::<i32>()
-            .expect(format!("Failed to parse {}", &line).as_str());
+            .unwrap_or_else(|_| panic!("Failed to parse {}", line));
         array.push(integer);
 
         line.clear();
@@ -75,6 +77,6 @@ fn main() {
             None
         }
     };
-    
+
     println!("Result: {}", result.expect("Failed to find sum product"));
 }

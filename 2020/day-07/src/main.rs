@@ -1,6 +1,7 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
-    collections::HashMap,
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     env,
     fs::File,
     io::{BufRead, BufReader},
@@ -27,20 +28,20 @@ impl BagTracker {
     fn parse_line(&mut self, line: &str) {
         let mut split = line.split("contain");
         let container = split
-            .nth(0)
+            .next()
             .expect("Failed to find container")
             .strip_suffix(" bags ")
             .expect("Failed to strip 'bags' suffix");
 
         split
-            .nth(0)
+            .next()
             .expect("Failed to find containees")
-            .split(",")
+            .split(',')
             .filter_map(|token| {
                 let description = token
                     .trim()
-                    .trim_end_matches(".")
-                    .trim_end_matches("s")
+                    .trim_end_matches('.')
+                    .trim_end_matches('s')
                     .strip_suffix(" bag")
                     .expect("Failed to strip 'bags' suffix");
 
@@ -116,14 +117,16 @@ fn main() {
     }
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let mut tracker = BagTracker::new();
 
     let mut line = String::new();
     loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
+        let bytes = reader
+            .read_line(&mut line)
+            .unwrap_or_else(|_| panic!("Failed to read line"));
         if bytes == 0 {
             break;
         }

@@ -1,3 +1,5 @@
+#![deny(clippy::all, clippy::pedantic)]
+
 use std::{
     env,
     fs::File,
@@ -25,7 +27,7 @@ impl AddAssign for Counts {
 impl QuestionCounter {
     fn new() -> Self {
         Self {
-            any_person: 0u32,
+            any_person: 0_u32,
             all_people: u32::MAX,
         }
     }
@@ -66,7 +68,7 @@ fn main() {
     }
 
     let filename = &args[1];
-    let file = File::open(filename).expect(format!("Failed to open file {}", filename).as_str());
+    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
     let mut counter = QuestionCounter::new();
@@ -77,7 +79,9 @@ fn main() {
 
     let mut line = String::new();
     loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
+        let bytes = reader
+            .read_line(&mut line)
+            .unwrap_or_else(|_| panic!("Failed to read line"));
         if bytes == 0 {
             break;
         }
