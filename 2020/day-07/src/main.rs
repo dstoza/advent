@@ -6,14 +6,14 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-struct Containee {
+struct Container {
     name: String,
     count: i32,
 }
 
 struct ShinyGoldTracker {
     held_by: HashMap<String, Vec<String>>,
-    holds: HashMap<String, Vec<Containee>>,
+    holds: HashMap<String, Vec<Container>>,
 }
 
 impl ShinyGoldTracker {
@@ -48,7 +48,7 @@ impl ShinyGoldTracker {
                     return None;
                 }
 
-                Some(Containee {
+                Some(Container {
                     name: String::from(&description[2..]),
                     count: description[0..1]
                         .parse()
@@ -68,9 +68,9 @@ impl ShinyGoldTracker {
             });
     }
 
-    fn compute_container_count(&self) -> usize {
+    fn compute_container_count(&self, name: &str) -> usize {
         let mut work_queue = VecDeque::new();
-        work_queue.push_back("shiny gold");
+        work_queue.push_back(name);
 
         let mut containers = HashSet::new();
 
@@ -90,34 +90,22 @@ impl ShinyGoldTracker {
         containers.len()
     }
 
-    fn compute_contained_count(&self) -> i32 {
-        let mut work_queue = VecDeque::new();
-        work_queue.push_back(Containee {
-            name: String::from("shiny gold"),
-            count: 1,
-        });
-
-        // Initialize to -1 so we don't count the original shiny gold bag
-        let mut contained_count = -1;
-
-        while !work_queue.is_empty() {
-            let current = work_queue
-                .pop_front()
-                .expect("Failed to pop front of queue");
-
-            contained_count += current.count;
-
-            if let Some(children) = self.holds.get(&current.name) {
-                for child in children {
-                    work_queue.push_back(Containee {
-                        name: child.name.clone(),
-                        count: current.count * child.count,
-                    });
-                }
-            }
+    fn compute_containee_count(
+        &self,
+        container: &Container,
+        containee_counts: &mut HashMap<String, i32>,
+    ) -> i32 {
+        if let Some(count) = containee_counts.get(&container.name) {
+            return container.count * (1 + *count);
         }
 
-        contained_count
+        let mut containee_count = 0;
+        for containee in self.holds.get(&container.name).unwrap_or(&Vec::new()) {
+            containee_count += self.compute_containee_count(containee, containee_counts);
+        }
+
+        containee_counts.insert(container.name.clone(), containee_count);
+        container.count * (1 + containee_count)
     }
 }
 
@@ -145,6 +133,20 @@ fn main() {
         line.clear();
     }
 
-    println!("Can contain shiny gold: {}", tracker.compute_container_count());
-    println!("Shiny gold contains: {}", tracker.compute_contained_count());
+    println!(
+        "Can contain shiny gold: {}",
+        tracker.compute_container_count("shiny gold")
+    );
+
+    // Subtract 1 since we don't want to account for the shiny gold bag itself
+    println!(
+        "Shiny gold contains: {}",
+        tracker.compute_containee_count(
+            &Container {
+                name: String::from("shiny gold"),
+                count: 1,
+            },
+            &mut HashMap::new()
+        ) - 1
+    );
 }
