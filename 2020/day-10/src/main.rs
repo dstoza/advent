@@ -48,7 +48,7 @@ impl AdapterChainer {
         // This is the final adapter, which always hooks directly to the device
         arrangements[1] = 1;
 
-        for index in 1..self.adapters.len() {
+        for index in 2..self.adapters.len() {
             for offset in 1..=3 {
                 if self.adapters[index - offset] - self.adapters[index] < 4 {
                     arrangements[index] += arrangements[index - offset];
