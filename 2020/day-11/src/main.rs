@@ -11,16 +11,13 @@ use std::{
 
 extern crate test;
 
+use bit_vec::BitVec;
+
 #[derive(Clone, Copy)]
 enum Cell {
     Floor,
     Empty,
     Occupied,
-}
-
-struct Change {
-    address: usize,
-    cell: Cell,
 }
 
 #[derive(Clone)]
@@ -29,6 +26,9 @@ struct Layout {
     map: Vec<Cell>,
     column_count: i32,
     row_count: i32,
+    adjacent_indices: Vec<u16>,
+    updated_indices: Vec<u16>,
+    occupied_seats: BitVec,
 }
 
 impl Layout {
@@ -38,6 +38,9 @@ impl Layout {
             map: Vec::new(),
             column_count: -1,
             row_count: 0,
+            adjacent_indices: Vec::new(),
+            updated_indices: Vec::new(),
+            occupied_seats: BitVec::new(),
         }
     }
 
@@ -67,104 +70,125 @@ impl Layout {
         self.row_count += 1;
     }
 
-    fn get_address(&self, row: i32, column: i32) -> usize {
+    fn get_index(&self, row: i32, column: i32) -> u16 {
         (row * self.column_count + column)
             .try_into()
-            .expect("Failed to store address in usize")
+            .expect("Failed to store address in u16")
     }
 
-    fn get_cell(&self, row: i32, column: i32) -> Cell {
-        self.map[self.get_address(row, column)]
-    }
-
-    fn has_adjacent_occupant(
+    fn get_adjacent_seat_index(
         &self,
         mut row: i32,
         mut column: i32,
         delta_x: i32,
         delta_y: i32,
-    ) -> bool {
+    ) -> Option<u16> {
         loop {
             row += delta_y;
             column += delta_x;
 
             if row < 0 || row >= self.row_count {
-                return false;
+                return None;
             }
             if column < 0 || column >= self.column_count {
-                return false;
+                return None;
             }
 
-            match self.get_cell(row, column) {
+            let index = self.get_index(row, column);
+            match self
+                .map
+                .get(index as usize)
+                .unwrap_or_else(|| panic!("Index {} not found in map", index))
+            {
                 Cell::Floor => (),
-                Cell::Empty => return false,
-                Cell::Occupied => return true,
+                Cell::Empty | Cell::Occupied => return Some(index),
             }
 
             if !self.line_of_sight {
-                return false;
+                return None;
             }
         }
     }
 
-    fn count_adjacent_occupants(&self, row: i32, column: i32, expecting_zero: bool) -> i32 {
-        let mut count = 0;
+    fn get_adjacent_indices(&self, row: i32, column: i32) -> Vec<u16> {
+        let mut indices = Vec::new();
+
         for delta_y in -1..=1 {
             for delta_x in -1..=1 {
                 if delta_x == 0 && delta_y == 0 {
                     continue;
                 }
 
-                if self.has_adjacent_occupant(row, column, delta_x, delta_y) {
-                    count += 1;
-                    if expecting_zero || count >= 5 {
-                        return count;
-                    }
+                if let Some(index) = self.get_adjacent_seat_index(row, column, delta_x, delta_y) {
+                    indices.push(index);
                 }
             }
         }
 
+        indices
+    }
+
+    fn finalize(&mut self) {
+        for row in 0..self.row_count {
+            for column in 0..self.column_count {
+                let index = self.get_index(row, column);
+                if let Cell::Floor = self.map[index as usize] {
+                    self.adjacent_indices.append(&mut vec![u16::max_value(); 8]);
+                    continue;
+                }
+
+                let mut adjacent_indices = self.get_adjacent_indices(row, column);
+                adjacent_indices.resize(8, u16::max_value());
+                self.adjacent_indices.append(&mut adjacent_indices);
+                self.updated_indices.push(index);
+            }
+        }
+        self.occupied_seats
+            .grow(self.adjacent_indices.len() / 8, false);
+    }
+
+    fn count_adjacent_occupants(&self, index: u16) -> i32 {
+        let mut count = 0;
+        for adjacent_index in
+            &self.adjacent_indices[((index as usize) * 8)..((index as usize) * 8 + 8)]
+        {
+            if *adjacent_index == u16::max_value() {
+                break;
+            }
+
+            if self.occupied_seats[*adjacent_index as usize] {
+                count += 1;
+            }
+        }
         count
     }
 
-    fn collect_changes(&self) -> Vec<Change> {
+    fn collect_changes(&self) -> Vec<u16> {
         let mut changes = Vec::new();
 
         let abandonment_threshold = if self.line_of_sight { 5 } else { 4 };
 
-        for row in 0..self.row_count {
-            for column in 0..self.column_count {
-                match self.get_cell(row, column) {
-                    Cell::Floor => continue,
-                    Cell::Empty => {
-                        if self.count_adjacent_occupants(row, column, true) == 0 {
-                            changes.push(Change {
-                                address: self.get_address(row, column),
-                                cell: Cell::Occupied,
-                            })
-                        }
-                    }
-                    Cell::Occupied => {
-                        if self.count_adjacent_occupants(row, column, false)
-                            >= abandonment_threshold
-                        {
-                            changes.push(Change {
-                                address: self.get_address(row, column),
-                                cell: Cell::Empty,
-                            })
-                        }
-                    }
+        for index in &self.updated_indices {
+            if self.occupied_seats[*index as usize] {
+                if self.count_adjacent_occupants(*index) >= abandonment_threshold {
+                    changes.push(*index);
                 }
+            } else if self.count_adjacent_occupants(*index) == 0 {
+                changes.push(*index);
             }
         }
 
         changes
     }
 
-    fn apply_changes(&mut self, mut changes: Vec<Change>) {
-        for change in changes.drain(..) {
-            self.map[change.address] = change.cell;
+    fn apply_changes(&mut self, changes: Vec<u16>) {
+        for change in &changes {
+            self.occupied_seats.set(
+                *change as usize,
+                self.occupied_seats[*change as usize] ^ true,
+            );
         }
+        self.updated_indices = changes;
     }
 
     fn evolve(&mut self) -> bool {
@@ -178,12 +202,9 @@ impl Layout {
     }
 
     fn count_occupants(&self) -> i32 {
-        self.map
+        self.occupied_seats
             .iter()
-            .map(|cell| match cell {
-                Cell::Occupied => 1,
-                _ => 0,
-            })
+            .map(|occupied| if occupied { 1 } else { 0 })
             .sum()
     }
 }
@@ -192,10 +213,15 @@ impl Display for Layout {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.row_count {
             for column in 0..self.column_count {
+                let index = self.get_index(row, column);
                 write!(
                     f,
                     "{}",
-                    match self.get_cell(row, column) {
+                    match self
+                        .map
+                        .get(index as usize)
+                        .unwrap_or_else(|| panic!("Index {} not found in map", index))
+                    {
                         Cell::Floor => '.',
                         Cell::Empty => 'L',
                         Cell::Occupied => '#',
@@ -237,6 +263,8 @@ fn main() {
         line.clear();
     }
 
+    layout.finalize();
+
     while layout.evolve() {}
     println!("Occupied seats: {}", layout.count_occupants());
 }
@@ -263,6 +291,8 @@ mod tests {
             layout.add_line(line.trim());
             line.clear();
         }
+
+        layout.finalize();
 
         layout
     }
