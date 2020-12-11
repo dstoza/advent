@@ -23,7 +23,7 @@ struct Change {
 #[derive(Clone)]
 struct Layout {
     map: Vec<Cell>,
-    stride: i32,
+    column_count: i32,
     row_count: i32,
 }
 
@@ -31,7 +31,7 @@ impl Layout {
     fn new() -> Self {
         Self {
             map: Vec::new(),
-            stride: -1,
+            column_count: -1,
             row_count: 0,
         }
     }
@@ -46,13 +46,16 @@ impl Layout {
             })
         }
 
-        let incoming_stride: i32 = line.len().try_into().expect("Couldn't store stride in i32");
-        if self.stride < 0 {
-            self.stride = incoming_stride;
-        } else if incoming_stride != self.stride {
+        let incoming_column_count: i32 = line
+            .len()
+            .try_into()
+            .expect("Couldn't store column count in i32");
+        if self.column_count < 0 {
+            self.column_count = incoming_column_count;
+        } else if incoming_column_count != self.column_count {
             panic!(
-                "Incoming stride {} different from stored stride {}",
-                incoming_stride, self.stride
+                "Incoming column count {} different from stored column count {}",
+                incoming_column_count, self.column_count
             );
         }
 
@@ -60,7 +63,7 @@ impl Layout {
     }
 
     fn get_address(&self, row: i32, column: i32) -> usize {
-        (row * self.stride + column)
+        (row * self.column_count + column)
             .try_into()
             .expect("Failed to store address in usize")
     }
@@ -84,7 +87,7 @@ impl Layout {
             if row < 0 || row >= self.row_count {
                 return false;
             }
-            if column < 0 || column >= self.stride {
+            if column < 0 || column >= self.column_count {
                 return false;
             }
 
@@ -132,7 +135,7 @@ impl Layout {
         let abandonment_threshold = if line_of_sight { 5 } else { 4 };
 
         for row in 0..self.row_count {
-            for column in 0..self.stride {
+            for column in 0..self.column_count {
                 match self.get_cell(row, column) {
                     Cell::Floor => continue,
                     Cell::Empty => {
@@ -190,7 +193,7 @@ impl Layout {
 impl Display for Layout {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.row_count {
-            for column in 0..self.stride {
+            for column in 0..self.column_count {
                 write!(
                     f,
                     "{}",
