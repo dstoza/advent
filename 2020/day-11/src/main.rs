@@ -1,4 +1,5 @@
 #![deny(clippy::all, clippy::pedantic)]
+#![feature(test)]
 
 use std::{
     convert::TryInto,
@@ -7,6 +8,8 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
 };
+
+extern crate test;
 
 #[derive(Clone, Copy)]
 enum Cell {
@@ -114,9 +117,7 @@ impl Layout {
 
                 if self.has_adjacent_occupant(row, column, delta_x, delta_y) {
                     count += 1;
-                    if expecting_zero {
-                        return count;
-                    } else if count >= 5 {
+                    if expecting_zero || count >= 5 {
                         return count;
                     }
                 }
@@ -238,4 +239,51 @@ fn main() {
 
     while layout.evolve() {}
     println!("Occupied seats: {}", layout.count_occupants());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+
+    fn get_layout(line_of_sight: bool) -> Layout {
+        let file = File::open("input.txt").expect("Failed to open input.txt");
+        let mut reader = BufReader::new(file);
+
+        let mut layout = Layout::new(line_of_sight);
+
+        let mut line = String::new();
+        loop {
+            let bytes = reader
+                .read_line(&mut line)
+                .unwrap_or_else(|_| panic!("Failed to read line"));
+            if bytes == 0 {
+                break;
+            }
+            layout.add_line(line.trim());
+            line.clear();
+        }
+
+        layout
+    }
+
+    #[bench]
+    fn bench_adjacent(bencher: &mut Bencher) {
+        let layout = get_layout(false);
+        bencher.iter(|| {
+            let mut cloned = layout.clone();
+            while cloned.evolve() {}
+            assert_eq!(cloned.count_occupants(), 2361);
+        });
+    }
+
+    #[bench]
+    fn bench_line_of_sight(bencher: &mut Bencher) {
+        let layout = get_layout(true);
+        bencher.iter(|| {
+            let mut cloned = layout.clone();
+            while cloned.evolve() {}
+            assert_eq!(cloned.count_occupants(), 2119);
+        });
+    }
 }
