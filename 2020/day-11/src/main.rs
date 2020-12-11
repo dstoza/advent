@@ -22,14 +22,16 @@ struct Change {
 
 #[derive(Clone)]
 struct Layout {
+    line_of_sight: bool,
     map: Vec<Cell>,
     column_count: i32,
     row_count: i32,
 }
 
 impl Layout {
-    fn new() -> Self {
+    fn new(line_of_sight: bool) -> Self {
         Self {
+            line_of_sight,
             map: Vec::new(),
             column_count: -1,
             row_count: 0,
@@ -78,7 +80,6 @@ impl Layout {
         mut column: i32,
         delta_x: i32,
         delta_y: i32,
-        line_of_sight: bool,
     ) -> bool {
         loop {
             row += delta_y;
@@ -97,19 +98,13 @@ impl Layout {
                 Cell::Occupied => return true,
             }
 
-            if !line_of_sight {
+            if !self.line_of_sight {
                 return false;
             }
         }
     }
 
-    fn count_adjacent_occupants(
-        &self,
-        row: i32,
-        column: i32,
-        expecting_zero: bool,
-        line_of_sight: bool,
-    ) -> i32 {
+    fn count_adjacent_occupants(&self, row: i32, column: i32, expecting_zero: bool) -> i32 {
         let mut count = 0;
         for delta_y in -1..=1 {
             for delta_x in -1..=1 {
@@ -117,9 +112,11 @@ impl Layout {
                     continue;
                 }
 
-                if self.has_adjacent_occupant(row, column, delta_x, delta_y, line_of_sight) {
+                if self.has_adjacent_occupant(row, column, delta_x, delta_y) {
                     count += 1;
                     if expecting_zero {
+                        return count;
+                    } else if count >= 5 {
                         return count;
                     }
                 }
@@ -129,17 +126,17 @@ impl Layout {
         count
     }
 
-    fn collect_changes(&self, line_of_sight: bool) -> Vec<Change> {
+    fn collect_changes(&self) -> Vec<Change> {
         let mut changes = Vec::new();
 
-        let abandonment_threshold = if line_of_sight { 5 } else { 4 };
+        let abandonment_threshold = if self.line_of_sight { 5 } else { 4 };
 
         for row in 0..self.row_count {
             for column in 0..self.column_count {
                 match self.get_cell(row, column) {
                     Cell::Floor => continue,
                     Cell::Empty => {
-                        if self.count_adjacent_occupants(row, column, true, line_of_sight) == 0 {
+                        if self.count_adjacent_occupants(row, column, true) == 0 {
                             changes.push(Change {
                                 address: self.get_address(row, column),
                                 cell: Cell::Occupied,
@@ -147,7 +144,7 @@ impl Layout {
                         }
                     }
                     Cell::Occupied => {
-                        if self.count_adjacent_occupants(row, column, false, line_of_sight)
+                        if self.count_adjacent_occupants(row, column, false)
                             >= abandonment_threshold
                         {
                             changes.push(Change {
@@ -169,8 +166,8 @@ impl Layout {
         }
     }
 
-    fn evolve(&mut self, line_of_sight: bool) -> bool {
-        let changes = self.collect_changes(line_of_sight);
+    fn evolve(&mut self) -> bool {
+        let changes = self.collect_changes();
         if changes.is_empty() {
             return false;
         }
@@ -223,7 +220,7 @@ fn main() {
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
-    let mut layout = Layout::new();
+    let mut layout = Layout::new(line_of_sight);
 
     let mut line = String::new();
     loop {
@@ -239,6 +236,6 @@ fn main() {
         line.clear();
     }
 
-    while layout.evolve(line_of_sight) {}
+    while layout.evolve() {}
     println!("Occupied seats: {}", layout.count_occupants());
 }
