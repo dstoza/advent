@@ -22,12 +22,14 @@ struct ProgramLoader {
 
 impl ProgramLoader {
     fn new(mode: Mode) -> Self {
+        let mut memory = HashMap::new();
+        memory.reserve(100_000);
         Self {
             mode,
             set_mask: 0,
             clear_mask: 0,
             floating_bits: Vec::new(),
-            memory: HashMap::new(),
+            memory,
         }
     }
 
@@ -49,20 +51,24 @@ impl ProgramLoader {
         }
     }
 
-    fn write_value(&mut self, address: u64, mut floating_bits: Vec<u8>, value: u64) {
+    fn write_value(memory: &mut HashMap<u64, u64>, address: u64, floating_bits: &[u8], value: u64) {
         if floating_bits.is_empty() {
-            println!("Writing {} to {}", value, address);
-            self.memory.insert(address, value);
+            memory.insert(address, value);
             return;
         }
 
-        let floating_bit = floating_bits.pop().expect("Failed to pop floating bit");
-        self.write_value(
-            address | 1_u64 << floating_bit,
-            floating_bits.clone(),
+        ProgramLoader::write_value(
+            memory,
+            address | 1_u64 << floating_bits[0],
+            &floating_bits[1..],
             value,
         );
-        self.write_value(address & !(1_u64 << floating_bit), floating_bits, value);
+        ProgramLoader::write_value(
+            memory,
+            address & !(1_u64 << floating_bits[0]),
+            &floating_bits[1..],
+            value,
+        );
     }
 
     fn write_memory(&mut self, line: &str) {
@@ -80,12 +86,14 @@ impl ProgramLoader {
             .parse()
             .expect("Failed to parse value as u64");
 
-        println!("floating_bits: {:?}", self.floating_bits);
-        println!("set_mask: {}", self.set_mask);
-        println!("clear_mask: {}", self.clear_mask);
         match self.mode {
             Mode::Address => {
-                self.write_value(address | self.set_mask, self.floating_bits.clone(), value);
+                ProgramLoader::write_value(
+                    &mut self.memory,
+                    address | self.set_mask,
+                    &self.floating_bits,
+                    value,
+                );
                 None
             }
             Mode::Value => self
@@ -109,15 +117,21 @@ impl ProgramLoader {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    if args.len() < 2 || args.len() > 3 {
         return;
     }
+
+    let mode = match args[2].as_ref() {
+        "address" => Mode::Address,
+        "value" => Mode::Value,
+        _ => panic!("Unexpected mode {}", args[2]),
+    };
 
     let filename = &args[1];
     let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
     let mut reader = BufReader::new(file);
 
-    let mut loader = ProgramLoader::new(Mode::Address);
+    let mut loader = ProgramLoader::new(mode);
 
     let mut line = String::new();
     loop {
