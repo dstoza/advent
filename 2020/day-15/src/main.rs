@@ -13,10 +13,10 @@ struct MemoryGame {
 }
 
 impl MemoryGame {
-    fn new(initial_numbers: &str) -> Self {
+    fn new(initial_numbers: &str, turns: u32) -> Self {
         let mut current_turn = 1;
         let mut previous_number = 0;
-        let mut last_seen = vec![0; 30_000_000];
+        let mut last_seen = vec![0; turns as usize];
 
         for number in initial_numbers.split(',').map(|number| {
             number
@@ -70,6 +70,6 @@ fn main() {
 
     let n: u32 = args[2].parse().expect("Failed to parse n as u32");
 
-    let mut game = MemoryGame::new(line.trim());
+    let mut game = MemoryGame::new(line.trim(), n);
     println!("nth number: {}", game.nth(n));
 }
