@@ -56,7 +56,7 @@ impl MemoryGame {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    if args.len() < 3 {
         return;
     }
 
@@ -69,6 +69,8 @@ fn main() {
         .read_line(&mut line)
         .unwrap_or_else(|_| panic!("Failed to read line"));
 
+    let n: i32 = args[2].parse().expect("Failed to parse n as i32");
+
     let mut game = MemoryGame::new(line.trim());
-    println!("nth number: {}", game.nth(30_000_000));
+    println!("nth number: {}", game.nth(n));
 }
