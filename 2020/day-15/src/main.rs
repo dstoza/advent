@@ -1,30 +1,29 @@
 #![deny(clippy::all, clippy::pedantic)]
 
 use std::{
-    collections::HashMap,
     env,
     fs::File,
     io::{BufRead, BufReader},
 };
 
 struct MemoryGame {
-    current_turn: i32,
-    previous_number: i32,
-    last_seen: HashMap<i32, i32>,
+    current_turn: u32,
+    previous_number: u32,
+    last_seen: Vec<u32>,
 }
 
 impl MemoryGame {
     fn new(initial_numbers: &str) -> Self {
         let mut current_turn = 1;
         let mut previous_number = 0;
-        let mut last_seen = HashMap::new();
+        let mut last_seen = vec![0; 30_000_000];
 
         for number in initial_numbers.split(',').map(|number| {
             number
-                .parse::<i32>()
+                .parse::<u32>()
                 .expect("Failed to parse number as i32")
         }) {
-            last_seen.insert(number, current_turn);
+            last_seen[number as usize] = current_turn;
             previous_number = number;
             current_turn += 1;
         }
@@ -36,15 +35,15 @@ impl MemoryGame {
         }
     }
 
-    fn nth(&mut self, n: i32) -> i32 {
+    fn nth(&mut self, n: u32) -> u32 {
         while self.current_turn <= n {
-            let current_number = match self.last_seen.get(&self.previous_number) {
-                Some(last_seen) => self.current_turn - 1 - *last_seen,
-                None => 0,
+            let current_number = if self.last_seen[self.previous_number as usize] > 0 {
+                self.current_turn - 1 - self.last_seen[self.previous_number as usize]
+            } else {
+                0
             };
 
-            self.last_seen
-                .insert(self.previous_number, self.current_turn - 1);
+            self.last_seen[self.previous_number as usize] = self.current_turn - 1;
 
             self.previous_number = current_number;
             self.current_turn += 1;
@@ -69,7 +68,7 @@ fn main() {
         .read_line(&mut line)
         .unwrap_or_else(|_| panic!("Failed to read line"));
 
-    let n: i32 = args[2].parse().expect("Failed to parse n as i32");
+    let n: u32 = args[2].parse().expect("Failed to parse n as u32");
 
     let mut game = MemoryGame::new(line.trim());
     println!("nth number: {}", game.nth(n));
