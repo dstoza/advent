@@ -18,7 +18,6 @@ impl MemoryGame {
         let mut current_turn = 1;
         let mut previous_number = 0;
         let mut last_seen = HashMap::new();
-        last_seen.reserve(30_000_000);
 
         for number in initial_numbers.split(',').map(|number| {
             number
@@ -44,7 +43,9 @@ impl MemoryGame {
                 None => 0,
             };
 
-            self.last_seen.insert(self.previous_number, self.current_turn - 1);
+            self.last_seen
+                .insert(self.previous_number, self.current_turn - 1);
+
             self.previous_number = current_number;
             self.current_turn += 1;
         }
