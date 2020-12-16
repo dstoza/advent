@@ -85,6 +85,7 @@ impl TicketValidator {
 
     fn get_possible_field_ids(&self, ticket: &str) -> Vec<BitSet> {
         let mut possibilities = Vec::new();
+
         for value in ticket.split(',').map(|value| {
             value
                 .parse::<i32>()
@@ -104,6 +105,7 @@ impl TicketValidator {
                 .collect();
             possibilities.push(field_ids);
         }
+
         possibilities
     }
 
@@ -113,6 +115,7 @@ impl TicketValidator {
                 return field.name.clone();
             }
         }
+
         String::from("Unknown")
     }
 }
@@ -138,6 +141,7 @@ fn simplify_possibilities(possibilities: &mut Vec<BitSet>) {
         let singleton = singletons
             .pop()
             .expect("Failed to get singleton from non-empty collection");
+
         for field_possibilities in &mut *possibilities {
             if field_possibilities.len() > 1 {
                 field_possibilities.remove(singleton);
@@ -230,14 +234,14 @@ fn main() {
 
     simplify_possibilities(&mut possibilities);
 
-    let mut your_fields = your_ticket
+    let mut your_values = your_ticket
         .split(',')
         .map(|field| field.parse::<i64>().expect("Failed to parse field as i64"));
 
     let product: i64 = possibilities
         .iter()
         .filter_map(|field_possibilities| {
-            let value = your_fields.next().expect("Failed to find field value");
+            let value = your_values.next().expect("Failed to find field value");
             let field_name = validator.get_field_name(
                 field_possibilities
                     .iter()
