@@ -22,7 +22,7 @@ impl PocketDimension {
             + x
     }
 
-    fn new(dimensions: u32, iterations: usize, initial_state: Vec<String>) -> Self {
+    fn new(dimensions: u32, iterations: usize, initial_state: &[String]) -> Self {
         let mut cubes = BitVec::new();
         let padding = iterations + 1;
         let side_length = initial_state.len() + padding * 2;
@@ -38,7 +38,7 @@ impl PocketDimension {
                 };
                 let w_offset = match dimensions {
                     3 => 0,
-                    4 =>  padding * side_length * side_length * side_length,
+                    4 => padding * side_length * side_length * side_length,
                     _ => panic!("Unexpected dimensionality {}", dimensions),
                 };
                 cubes.set(
@@ -52,13 +52,11 @@ impl PocketDimension {
             }
         }
 
-        let pocket_dimension = Self {
+        Self {
             dimensions,
             side_length,
             cubes,
-        };
-
-        pocket_dimension
+        }
     }
 
     fn count_active_neighbors(
@@ -114,7 +112,7 @@ impl PocketDimension {
                         let address = self.get_address(x, y, z, w);
                         if self.cubes[address] {
                             let active_neighbors = self.count_active_neighbors(x, y, z, w);
-                            if active_neighbors < 2 || active_neighbors > 3 {
+                            if !(2..=3).contains(&active_neighbors) {
                                 changes.push(address);
                             }
                         } else if self.count_active_neighbors(x, y, z, w) == 3 {
@@ -167,7 +165,7 @@ fn main() {
     let dimensions: u32 = args[2].parse().expect("Failed to parse dimensionality");
 
     let iterations = 6;
-    let mut pocket_dimension = PocketDimension::new(dimensions, iterations, initial_state);
+    let mut pocket_dimension = PocketDimension::new(dimensions, iterations, &initial_state);
     for _ in 0..iterations {
         pocket_dimension.simulate();
     }
