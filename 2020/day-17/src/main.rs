@@ -16,11 +16,15 @@ struct PocketDimension {
 }
 
 impl PocketDimension {
-    fn get_address(&self, x: usize, y: usize, z: usize, w: usize) -> usize {
-        w * self.side_length * self.side_length * self.side_length
-            + z * self.side_length * self.side_length
-            + y * self.side_length
+    fn address_helper(side_length: usize, x: usize, y: usize, z: usize, w: usize) -> usize {
+        w * side_length * side_length * side_length
+            + z * side_length * side_length
+            + y * side_length
             + x
+    }
+
+    fn get_address(&self, x: usize, y: usize, z: usize, w: usize) -> usize {
+        PocketDimension::address_helper(self.side_length, x, y, z, w)
     }
 
     fn new(dimensions: u32, iterations: usize, initial_state: &[String]) -> Self {
@@ -37,17 +41,13 @@ impl PocketDimension {
                     b'.' => false,
                     _ => panic!("Unexpected byte {}", line.as_bytes()[x]),
                 };
-                let w_offset = match dimensions {
+                let w = match dimensions {
                     3 => 0,
-                    4 => margin * side_length * side_length * side_length,
+                    4 => margin,
                     _ => panic!("Unexpected dimensionality {}", dimensions),
                 };
                 cubes.set(
-                    w_offset
-                        + margin * side_length * side_length
-                        + (y + margin) * side_length
-                        + x
-                        + margin,
+                    PocketDimension::address_helper(side_length, x + margin, y + margin, margin, w),
                     cube,
                 );
             }
