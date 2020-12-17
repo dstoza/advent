@@ -11,6 +11,7 @@ use bit_vec::BitVec;
 struct PocketDimension {
     dimensions: u32,
     side_length: usize,
+    margin: usize,
     cubes: BitVec,
 }
 
@@ -24,8 +25,8 @@ impl PocketDimension {
 
     fn new(dimensions: u32, iterations: usize, initial_state: &[String]) -> Self {
         let mut cubes = BitVec::new();
-        let padding = iterations + 1;
-        let side_length = initial_state.len() + padding * 2;
+        let margin = iterations + 1;
+        let side_length = initial_state.len() + margin * 2;
         cubes.grow(side_length * side_length * side_length * side_length, false);
 
         for y in 0..initial_state.len() {
@@ -38,15 +39,15 @@ impl PocketDimension {
                 };
                 let w_offset = match dimensions {
                     3 => 0,
-                    4 => padding * side_length * side_length * side_length,
+                    4 => margin * side_length * side_length * side_length,
                     _ => panic!("Unexpected dimensionality {}", dimensions),
                 };
                 cubes.set(
                     w_offset
-                        + padding * side_length * side_length
-                        + (y + padding) * side_length
+                        + margin * side_length * side_length
+                        + (y + margin) * side_length
                         + x
-                        + padding,
+                        + margin,
                     cube,
                 );
             }
@@ -55,6 +56,7 @@ impl PocketDimension {
         Self {
             dimensions,
             side_length,
+            margin,
             cubes,
         }
     }
@@ -99,16 +101,19 @@ impl PocketDimension {
     fn simulate(&mut self) {
         let mut changes = Vec::new();
 
+        let range = self.margin - 1..self.side_length - self.margin;
+        self.margin -= 1;
+
         let w_range = match self.dimensions {
             3 => 0..1,
-            4 => 1..self.side_length - 1,
+            4 => range.clone(),
             _ => panic!("Unexpected dimensionality {}", self.dimensions),
         };
 
         for w in w_range {
-            for z in 1..self.side_length - 1 {
-                for y in 1..self.side_length - 1 {
-                    for x in 1..self.side_length - 1 {
+            for z in range.clone() {
+                for y in range.clone() {
+                    for x in range.clone() {
                         let address = self.get_address(x, y, z, w);
                         if self.cubes[address] {
                             let active_neighbors = self.count_active_neighbors(x, y, z, w);
