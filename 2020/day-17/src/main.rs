@@ -6,13 +6,11 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use bit_vec::BitVec;
-
 struct PocketDimension {
     dimensions: u32,
     side_length: usize,
     margin: usize,
-    cubes: BitVec,
+    cubes: Vec<bool>,
 }
 
 impl PocketDimension {
@@ -28,10 +26,10 @@ impl PocketDimension {
     }
 
     fn new(dimensions: u32, iterations: usize, initial_state: &[String]) -> Self {
-        let mut cubes = BitVec::new();
+        let mut cubes = Vec::new();
         let margin = iterations + 1;
         let side_length = initial_state.len() + margin * 2;
-        cubes.grow(side_length * side_length * side_length * side_length, false);
+        cubes.resize(side_length * side_length * side_length * side_length, false);
 
         for y in 0..initial_state.len() {
             let line = &initial_state[y];
@@ -46,10 +44,7 @@ impl PocketDimension {
                     4 => margin,
                     _ => panic!("Unexpected dimensionality {}", dimensions),
                 };
-                cubes.set(
-                    PocketDimension::address_helper(side_length, x + margin, y + margin, margin, w),
-                    cube,
-                );
+                cubes[PocketDimension::address_helper(side_length, x + margin, y + margin, margin, w)] = cube;
             }
         }
 
@@ -129,14 +124,14 @@ impl PocketDimension {
         }
 
         for change in changes {
-            self.cubes.set(change, self.cubes[change] ^ true);
+            self.cubes[change] ^= true;
         }
     }
 
     fn get_active_count(&self) -> u32 {
         self.cubes
             .iter()
-            .map(|active| if active { 1 } else { 0 })
+            .map(|active| if *active { 1 } else { 0 })
             .sum()
     }
 }
