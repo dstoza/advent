@@ -11,8 +11,6 @@ use std::{
 
 extern crate test;
 
-use bit_vec::BitVec;
-
 #[derive(Clone, Copy)]
 enum Cell {
     Floor,
@@ -28,7 +26,7 @@ struct Layout {
     row_count: i32,
     adjacent_indices: Vec<u16>,
     updated_indices: Vec<u16>,
-    occupied_seats: BitVec,
+    occupied_seats: Vec<bool>,
 }
 
 impl Layout {
@@ -40,7 +38,7 @@ impl Layout {
             row_count: 0,
             adjacent_indices: Vec::new(),
             updated_indices: Vec::new(),
-            occupied_seats: BitVec::new(),
+            occupied_seats: Vec::new(),
         }
     }
 
@@ -144,7 +142,7 @@ impl Layout {
             }
         }
         self.occupied_seats
-            .grow(self.adjacent_indices.len() / 8, false);
+            .resize(self.adjacent_indices.len() / 8, false);
     }
 
     fn count_adjacent_occupants(&self, index: u16) -> i32 {
@@ -183,10 +181,7 @@ impl Layout {
 
     fn apply_changes(&mut self, changes: Vec<u16>) {
         for change in &changes {
-            self.occupied_seats.set(
-                *change as usize,
-                self.occupied_seats[*change as usize] ^ true,
-            );
+            self.occupied_seats[*change as usize] ^= true;
         }
         self.updated_indices = changes;
     }
@@ -204,7 +199,7 @@ impl Layout {
     fn count_occupants(&self) -> i32 {
         self.occupied_seats
             .iter()
-            .map(|occupied| if occupied { 1 } else { 0 })
+            .map(|occupied| if *occupied { 1 } else { 0 })
             .sum()
     }
 }
