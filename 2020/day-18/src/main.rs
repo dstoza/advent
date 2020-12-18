@@ -75,28 +75,18 @@ fn evaluate_expression(advanced: bool, expression: &str) -> (i64, usize) {
             return (flatten_operations(advanced, &operations), cursor + 2);
         }
 
-        operations.push(match &expression[cursor..cursor + 3] {
-            " + " => {
-                let (value, advance) = get_next_value(advanced, &expression[cursor + 3..]);
-                cursor += 3 + advance;
-                Operation {
-                    command: Command::Add,
-                    value,
-                }
-            }
-            " * " => {
-                let (value, advance) = get_next_value(advanced, &expression[cursor + 3..]);
-                cursor += 3 + advance;
-                Operation {
-                    command: Command::Multiply,
-                    value,
-                }
-            }
+        let command = match &expression[cursor..cursor + 3] {
+            " + " => Command::Add,
+            " * " => Command::Multiply,
             _ => panic!(
                 "Unexpected continuation [{}]",
                 &expression[cursor..cursor + 3]
             ),
-        });
+        };
+
+        let (value, advance) = get_next_value(advanced, &expression[cursor + 3..]);
+        cursor += 3 + advance;
+        operations.push(Operation { command, value })
     }
 
     (flatten_operations(advanced, &operations), cursor)
