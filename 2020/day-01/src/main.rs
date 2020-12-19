@@ -1,10 +1,7 @@
 #![deny(clippy::all, clippy::pedantic)]
 
-use std::{
-    env,
-    fs::File,
-    io::{BufRead, BufReader},
-};
+use clap::{crate_name, App, Arg};
+use common::LineReader;
 
 fn sum_product2(sorted: &[i32], target: i32) -> Option<i32> {
     let mut candidate_index = sorted.len() - 1;
@@ -41,41 +38,29 @@ fn sum_product3(sorted: &[i32], target: i32) -> Option<i32> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 3 {
-        return;
-    }
+    let args = App::new(crate_name!())
+        .arg(Arg::from_usage("<FILE>"))
+        .arg(
+            Arg::from_usage("-n, --entries <ENTRIES> 'Number of entries to consider'")
+                .possible_value("2")
+                .possible_value("3"),
+        )
+        .get_matches();
 
-    let filename = &args[1];
-    let file = File::open(filename).unwrap_or_else(|_| panic!("Failed to open file {}", filename));
-    let mut reader = BufReader::new(file);
-
-    let mut line = String::new();
+    let mut reader = LineReader::new(args.value_of("FILE").unwrap());
     let mut array = Vec::<i32>::new();
-    loop {
-        let bytes = reader.read_line(&mut line).expect("Failed to read line");
-        if bytes == 0 {
-            break;
-        }
+    reader.read_with(|line| {
+        array.push(
+            line.parse()
+                .unwrap_or_else(|_| panic!("Failed to parse {}", line)),
+        )
+    });
 
-        let integer = line
-            .trim()
-            .parse::<i32>()
-            .unwrap_or_else(|_| panic!("Failed to parse {}", line));
-        array.push(integer);
-
-        line.clear();
-    }
-
-    let mode = &args[2];
     array.sort();
-    let result = match mode.as_str() {
+    let result = match args.value_of("entries").unwrap() {
         "2" => sum_product2(&array, 2020),
         "3" => sum_product3(&array, 2020),
-        _ => {
-            println!("Expected mode '2' or '3'");
-            None
-        }
+        _ => unreachable!("Impossible argument value"),
     };
 
     println!("Result: {}", result.expect("Failed to find sum product"));
