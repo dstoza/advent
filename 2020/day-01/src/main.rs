@@ -1,4 +1,7 @@
 #![deny(clippy::all, clippy::pedantic)]
+#![feature(test)]
+
+extern crate test;
 
 use clap::{crate_name, App, Arg};
 use common::LineReader;
@@ -37,6 +40,19 @@ fn sum_product3(sorted: &[i32], target: i32) -> Option<i32> {
     None
 }
 
+fn read_array(filename: &str) -> Vec<i32> {
+    let mut reader = LineReader::new(filename);
+    let mut array = Vec::<i32>::new();
+    reader.read_with(|line| {
+        array.push(
+            line.parse()
+                .unwrap_or_else(|_| panic!("Failed to parse {}", line)),
+        )
+    });
+
+    array
+}
+
 fn main() {
     let args = App::new(crate_name!())
         .arg(Arg::from_usage("<FILE>"))
@@ -47,15 +63,7 @@ fn main() {
         )
         .get_matches();
 
-    let mut reader = LineReader::new(args.value_of("FILE").unwrap());
-    let mut array = Vec::<i32>::new();
-    reader.read_with(|line| {
-        array.push(
-            line.parse()
-                .unwrap_or_else(|_| panic!("Failed to parse {}", line)),
-        )
-    });
-
+    let mut array = read_array(args.value_of("FILE").unwrap());
     array.sort_unstable();
     let result = match args.value_of("entries").unwrap() {
         "2" => sum_product2(&array, 2020),
@@ -64,4 +72,29 @@ fn main() {
     };
 
     println!("Result: {}", result.expect("Failed to find sum product"));
+}
+
+#[cfg(test)]
+mod tests {
+    use test::Bencher;
+
+    #[bench]
+    fn sum_product2(bencher: &mut Bencher) {
+        let array = super::read_array("input.txt");
+        bencher.iter(|| {
+            let mut array = array.clone();
+            array.sort_unstable();
+            assert_eq!(super::sum_product2(&array, 2020).unwrap(), 1019904);
+        })
+    }
+
+    #[bench]
+    fn sum_product3(bencher: &mut Bencher) {
+        let array = super::read_array("input.txt");
+        bencher.iter(|| {
+            let mut array = array.clone();
+            array.sort_unstable();
+            assert_eq!(super::sum_product3(&array, 2020).unwrap(), 176647680);
+        })
+    }
 }
