@@ -56,7 +56,7 @@ fn main() {
         )
     });
 
-    array.sort();
+    array.sort_unstable();
     let result = match args.value_of("entries").unwrap() {
         "2" => sum_product2(&array, 2020),
         "3" => sum_product3(&array, 2020),
