@@ -48,7 +48,6 @@ impl MessageValidator {
             .parse()
             .expect("Failed to parse rule ID");
 
-        /*
         if id == 8 {
             self.rules
                 .insert(8, Rule::Indirect(vec![vec![42], vec![42, 8]]));
@@ -58,59 +57,61 @@ impl MessageValidator {
                 .insert(11, Rule::Indirect(vec![vec![42, 31], vec![42, 11, 31]]));
             return;
         }
-        */
 
-        let rule = split.next().expect("Failed to find rule").trim();
+        let contents = split.next().expect("Failed to find rule").trim();
         self.rules.insert(
             id,
-            match &rule[0..=0] {
-                "\"" => Rule::Direct(String::from(&rule[1..=1])),
-                _ => Rule::Indirect(MessageValidator::parse_indirect(&rule[..])),
+            match &contents[0..=0] {
+                "\"" => Rule::Direct(String::from(&contents[1..=1])),
+                _ => Rule::Indirect(MessageValidator::parse_indirect(&contents[..])),
             },
         );
     }
 
-    fn message_matches_rule(&self, rule: &Rule, message: &str, level: i32) -> (bool, usize) {
-        for _ in 0..level {
-            print!("  ");
-        }
-        println!("message_matches_rule {:?} {}", rule, message);
-
+    fn message_matches_rule(&self, rule: &Rule, message: &str) -> Vec<usize> {
         if message.is_empty() {
-            return (false, 0);
+            return Vec::new();
         }
 
         match rule {
-            Rule::Direct(string) => (&message[0..string.len()] == string, 1),
+            Rule::Direct(string) => {
+                if &message[0..string.len()] == string {
+                    vec![1]
+                } else {
+                    Vec::new()
+                }
+            }
             Rule::Indirect(alternatives) => {
+                let mut lengths = Vec::new();
+
                 for alternative in alternatives {
-                    let mut cursor = 0;
-                    let mut match_found = true;
+                    let mut cursors = vec![0];
                     for child_id in alternative {
-                        let (child_matches, advance) = self.message_matches_rule(
-                            &self.rules[child_id],
-                            &message[cursor..],
-                            level + 1,
-                        );
-                        if !child_matches {
-                            match_found = false;
+                        let mut new_cursors = Vec::new();
+                        for cursor in cursors {
+                            let lengths = self
+                                .message_matches_rule(&self.rules[child_id], &message[cursor..]);
+                            for length in lengths {
+                                new_cursors.push(cursor + length);
+                            }
+                        }
+                        cursors = new_cursors;
+                        if cursors.is_empty() {
                             break;
                         }
-                        cursor += advance;
                     }
 
-                    if match_found {
-                        return (true, cursor);
-                    }
+                    lengths.append(&mut cursors);
                 }
-                (false, 0)
+
+                lengths
             }
         }
     }
 
     fn message_is_valid(&self, message: &str) -> bool {
-        let (matches, cursor) = self.message_matches_rule(&self.rules[&0], message, 0);
-        matches && cursor == message.len()
+        let match_lengths = self.message_matches_rule(&self.rules[&0], message);
+        match_lengths.iter().any(|length| *length == message.len())
     }
 }
 
