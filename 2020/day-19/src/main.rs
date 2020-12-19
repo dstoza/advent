@@ -1,27 +1,26 @@
 #![deny(clippy::all, clippy::pedantic)]
 
 use std::{
-    collections::HashMap,
     env,
     fs::File,
     io::{BufRead, BufReader},
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Rule {
     Indirect(Vec<Vec<u8>>),
     Direct(String),
 }
 
 struct MessageValidator {
-    rules: HashMap<u8, Rule>,
+    rules: Vec<Rule>,
 }
 
 impl MessageValidator {
     fn new() -> Self {
-        Self {
-            rules: HashMap::new(),
-        }
+        let mut rules = Vec::new();
+        rules.resize(256, Rule::Indirect(Vec::new()));
+        Self { rules }
     }
 
     fn parse_indirect(indirect: &str) -> Vec<Vec<u8>> {
@@ -49,23 +48,18 @@ impl MessageValidator {
             .expect("Failed to parse rule ID");
 
         if id == 8 {
-            self.rules
-                .insert(8, Rule::Indirect(vec![vec![42], vec![42, 8]]));
+            self.rules[8] = Rule::Indirect(vec![vec![42], vec![42, 8]]);
             return;
         } else if id == 11 {
-            self.rules
-                .insert(11, Rule::Indirect(vec![vec![42, 31], vec![42, 11, 31]]));
+            self.rules[11] = Rule::Indirect(vec![vec![42, 31], vec![42, 11, 31]]);
             return;
         }
 
         let contents = split.next().expect("Failed to find rule").trim();
-        self.rules.insert(
-            id,
-            match &contents[0..=0] {
-                "\"" => Rule::Direct(String::from(&contents[1..=1])),
-                _ => Rule::Indirect(MessageValidator::parse_indirect(&contents[..])),
-            },
-        );
+        self.rules[id as usize] = match &contents[0..=0] {
+            "\"" => Rule::Direct(String::from(&contents[1..=1])),
+            _ => Rule::Indirect(MessageValidator::parse_indirect(&contents[..])),
+        };
     }
 
     fn message_matches_rule(&self, rule: &Rule, message: &str) -> Vec<usize> {
@@ -89,8 +83,10 @@ impl MessageValidator {
                     for child_id in alternative {
                         let mut new_cursors = Vec::new();
                         for cursor in cursors {
-                            let lengths = self
-                                .message_matches_rule(&self.rules[child_id], &message[cursor..]);
+                            let lengths = self.message_matches_rule(
+                                &self.rules[(*child_id) as usize],
+                                &message[cursor..],
+                            );
                             for length in lengths {
                                 new_cursors.push(cursor + length);
                             }
@@ -110,7 +106,7 @@ impl MessageValidator {
     }
 
     fn message_is_valid(&self, message: &str) -> bool {
-        let match_lengths = self.message_matches_rule(&self.rules[&0], message);
+        let match_lengths = self.message_matches_rule(&self.rules[0], message);
         match_lengths.iter().any(|length| *length == message.len())
     }
 }
