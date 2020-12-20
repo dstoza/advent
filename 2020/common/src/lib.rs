@@ -15,7 +15,7 @@ impl LineReader {
         Self { reader }
     }
 
-    pub fn read_with<F>(&mut self, mut f: F)
+    pub fn read_with<F>(&mut self, mut f: F) -> bool
     where
         F: FnMut(&str),
     {
@@ -26,7 +26,12 @@ impl LineReader {
                 .read_line(&mut line)
                 .expect("Failed to read line");
             if bytes == 0 {
-                break;
+                return false;
+            }
+
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                return true;
             }
 
             f(line.trim());
