@@ -10,6 +10,7 @@ use common::LineReader;
 
 const TILE_SIZE: usize = 10;
 
+#[derive(Debug)]
 enum Side {
     Left = 0,
     Top = 1,
@@ -29,6 +30,18 @@ impl Side {
     }
 }
 
+enum Transformation {
+    None,
+    Rotate90,
+    Rotate180,
+    Rotate270,
+    FlipH,
+    Rotate90FlipH,
+    Rotate180FlipH,
+    Rotate270FlipH,
+}
+
+#[derive(Debug)]
 struct Tile {
     id: i16,
     // Stored LTRB, horizontal L->R, vertical T->B
@@ -83,6 +96,67 @@ impl Tile {
         unique_sides.dedup();
         unique_sides
     }
+
+    fn get_side_after_transformation(
+        &self,
+        transformation: Transformation,
+        side: Side,
+    ) -> [u8; TILE_SIZE] {
+        let (source, reverse) = match side {
+            Side::Left => match transformation {
+                Transformation::None => (Side::Left, false),
+                Transformation::Rotate90 => (Side::Bottom, false),
+                Transformation::Rotate180 => (Side::Right, true),
+                Transformation::Rotate270 => (Side::Top, true),
+                Transformation::FlipH => (Side::Right, false),
+                Transformation::Rotate90FlipH => (Side::Top, false),
+                Transformation::Rotate180FlipH => (Side::Left, true),
+                Transformation::Rotate270FlipH => (Side::Bottom, true),
+            },
+            Side::Top => match transformation {
+                Transformation::None => (Side::Top, false),
+                Transformation::Rotate90 => (Side::Left, true),
+                Transformation::Rotate180 => (Side::Bottom, true),
+                Transformation::Rotate270 => (Side::Right, false),
+                Transformation::FlipH => (Side::Top, true),
+                Transformation::Rotate90FlipH => (Side::Left, false),
+                Transformation::Rotate180FlipH => (Side::Bottom, false),
+                Transformation::Rotate270FlipH => (Side::Right, true),
+            },
+            Side::Right => match transformation {
+                Transformation::None => (Side::Right, false),
+                Transformation::Rotate90 => (Side::Top, false),
+                Transformation::Rotate180 => (Side::Left, true),
+                Transformation::Rotate270 => (Side::Bottom, true),
+                Transformation::FlipH => (Side::Left, false),
+                Transformation::Rotate90FlipH => (Side::Bottom, false),
+                Transformation::Rotate180FlipH => (Side::Right, true),
+                Transformation::Rotate270FlipH => (Side::Top, true),
+            },
+            Side::Bottom => match transformation {
+                Transformation::None => (Side::Bottom, false),
+                Transformation::Rotate90 => (Side::Right, true),
+                Transformation::Rotate180 => (Side::Top, true),
+                Transformation::Rotate270 => (Side::Left, false),
+                Transformation::FlipH => (Side::Bottom, true),
+                Transformation::Rotate90FlipH => (Side::Right, false),
+                Transformation::Rotate180FlipH => (Side::Top, false),
+                Transformation::Rotate270FlipH => (Side::Left, true),
+            },
+        };
+
+        let mut source_data = self.sides[source as usize].clone();
+        if reverse {
+            source_data.reverse();
+        }
+        source_data
+    }
+
+    /*
+    fn get_transformations_matching_constraints(&self, Vec<>) -> Vec<Transformation> {
+
+    }
+    */
 }
 
 fn main() {
