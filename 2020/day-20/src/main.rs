@@ -19,6 +19,7 @@ bitflags! {
 }
 
 const TILE_SIZE: usize = 10;
+const IMAGE_SIZE: usize = TILE_SIZE - 2;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Side {
@@ -42,7 +43,8 @@ impl Side {
 
 #[derive(Debug)]
 struct Tile {
-    id: i16,
+    id: u16,
+    image: Vec<Vec<u8>>,
     // Stored LTRB, horizontal L->R, vertical T->B
     sides: [[u8; TILE_SIZE]; 4],
     sides_with_neighbors: Vec<Side>,
@@ -58,12 +60,18 @@ impl Tile {
             .parse()
             .expect("Failed to parse ID as i16");
 
+        let mut image = vec![vec![b' '; IMAGE_SIZE]; IMAGE_SIZE];
+
         let mut left = [b'*'; TILE_SIZE];
         let mut right = [b'*'; TILE_SIZE];
-        for (i, line) in lines.iter().skip(1).enumerate() {
+        for (row, line) in lines.iter().skip(1).enumerate() {
             let bytes = line.as_bytes();
-            left[i] = bytes[0];
-            right[i] = bytes[bytes.len() - 1];
+            left[row] = bytes[0];
+            right[row] = bytes[bytes.len() - 1];
+
+            if (1..=IMAGE_SIZE).contains(&row) {
+                image[row - 1][..IMAGE_SIZE].clone_from_slice(&bytes[1..=IMAGE_SIZE]);
+            }
         }
 
         let top = lines[1]
@@ -79,6 +87,7 @@ impl Tile {
 
         Self {
             id,
+            image,
             sides,
             sides_with_neighbors: Vec::new(),
         }
@@ -88,6 +97,7 @@ impl Tile {
     fn from_sides(sides: [[u8; TILE_SIZE]; 4]) -> Self {
         Self {
             id: 0,
+            image: Vec::new(),
             sides,
             sides_with_neighbors: Vec::new(),
         }
@@ -96,11 +106,11 @@ impl Tile {
     fn get_unique_sides(&self) -> Vec<[u8; TILE_SIZE]> {
         let mut unique_sides = Vec::new();
         for side in &self.sides {
-            unique_sides.push(side.clone());
-            unique_sides.push(side.clone());
+            unique_sides.push(*side);
+            unique_sides.push(*side);
             unique_sides.last_mut().unwrap().reverse();
         }
-        unique_sides.sort();
+        unique_sides.sort_unstable();
         unique_sides.dedup();
         unique_sides
     }
@@ -152,7 +162,7 @@ impl Tile {
             side = Side::from_index((((side as u8) + 3) % 4) as usize);
         }
 
-        let mut side_bytes = self.sides[side as usize].clone();
+        let mut side_bytes = self.sides[side as usize];
         if reverse {
             side_bytes.reverse();
         }
@@ -171,51 +181,11 @@ impl Tile {
     }
 }
 
-fn main() {
-    let args = App::new(crate_name!())
-        .arg(Arg::from_usage("<FILE>"))
-        .get_matches();
-
-    let mut tiles = HashMap::new();
-    let mut tiles_with_side = HashMap::new();
-
-    let mut reader = LineReader::new(args.value_of("FILE").unwrap());
-
-    let mut tile_lines = Vec::new();
-    while reader.read_with(|line| tile_lines.push(String::from(line))) {
-        let tile = Tile::from_lines(&tile_lines);
-        for side in tile.get_unique_sides() {
-            tiles_with_side
-                .entry(side)
-                .or_insert(Vec::new())
-                .push(tile.id);
-        }
-        tiles.insert(tile.id, tile);
-        tile_lines.clear();
-    }
-
-    let mut corner_product = 1;
-    let mut corners = Vec::new();
-
-    for (_, tile) in &mut tiles {
-        let mut sides_with_neighbors = Vec::new();
-        for (i, side) in tile.sides.iter().enumerate() {
-            if tiles_with_side[side].iter().any(|id| *id != tile.id) {
-                sides_with_neighbors.push(Side::from_index(i));
-            }
-        }
-
-        if sides_with_neighbors.len() == 2 {
-            corner_product *= tile.id as u64;
-            corners.push(tile.id);
-        };
-
-        tile.sides_with_neighbors = sides_with_neighbors;
-    }
-
-    println!("Corner product: {}", corner_product);
-
-    let top_left_corner_id = corners[0];
+fn assemble_tiles(
+    top_left_corner_id: u16,
+    tiles: &HashMap<u16, Tile>,
+    tiles_with_side: &HashMap<[u8; TILE_SIZE], Vec<u16>>,
+) -> Vec<Vec<(u16, Transform)>> {
     let top_left_tile = &tiles[&top_left_corner_id];
     let transform_to_be_top_left = top_left_tile.get_transform_to_be_top_left();
 
@@ -231,8 +201,7 @@ fn main() {
             previous_tile.get_side_after_transform(Side::Right, *previous_tile_transform);
         if let Some(current_tile_id) = tiles_with_side[&previous_right_side]
             .iter()
-            .filter(|id| **id != *previous_tile_id)
-            .next()
+            .find(|id| **id != *previous_tile_id)
         {
             let current_tile = &tiles[current_tile_id];
             let current_tile_transform =
@@ -261,8 +230,7 @@ fn main() {
                 previous_tile.get_side_after_transform(Side::Bottom, *previous_tile_transform);
             if let Some(current_tile_id) = tiles_with_side[&previous_bottom_side]
                 .iter()
-                .filter(|id| **id != *previous_tile_id)
-                .next()
+                .find(|id| **id != *previous_tile_id)
             {
                 let current_tile = &tiles[current_tile_id];
                 let current_tile_transform =
@@ -278,6 +246,153 @@ fn main() {
         }
 
         rows.push(row);
+    }
+
+    rows
+}
+
+fn transform_image(image: &[Vec<u8>], transform: Transform) -> Vec<Vec<u8>> {
+    let mut result = vec![vec![b' '; image.len()]; image.len()];
+
+    if transform.contains(Transform::ROTATE_90) {
+        for (row_index, row) in result.iter_mut().enumerate() {
+            for column_index in 0..image.len() {
+                row[column_index] = image[image.len() - 1 - column_index][row_index];
+            }
+        }
+    } else {
+        result = Vec::from(image);
+    }
+
+    if transform.contains(Transform::FLIP_HORIZONTAL) {
+        for row in &mut result {
+            row.reverse();
+        }
+    }
+
+    if transform.contains(Transform::FLIP_VERTICAL) {
+        result.reverse();
+    }
+
+    result
+}
+
+fn main() {
+    let args = App::new(crate_name!())
+        .arg(Arg::from_usage("<FILE>"))
+        .get_matches();
+
+    let mut tiles = HashMap::new();
+    let mut tiles_with_side = HashMap::new();
+
+    let mut reader = LineReader::new(args.value_of("FILE").unwrap());
+
+    let mut tile_lines = Vec::new();
+    while reader.read_with(|line| tile_lines.push(String::from(line))) {
+        let tile = Tile::from_lines(&tile_lines);
+        for side in tile.get_unique_sides() {
+            tiles_with_side
+                .entry(side)
+                .or_insert_with(Vec::new)
+                .push(tile.id);
+        }
+        tiles.insert(tile.id, tile);
+        tile_lines.clear();
+    }
+
+    let mut corner_product = 1;
+    let mut corners = Vec::new();
+
+    for tile in tiles.values_mut() {
+        let mut sides_with_neighbors = Vec::new();
+        for (i, side) in tile.sides.iter().enumerate() {
+            if tiles_with_side[side].iter().any(|id| *id != tile.id) {
+                sides_with_neighbors.push(Side::from_index(i));
+            }
+        }
+
+        if sides_with_neighbors.len() == 2 {
+            corner_product *= u64::from(tile.id);
+            corners.push(tile.id);
+        };
+
+        tile.sides_with_neighbors = sides_with_neighbors;
+    }
+
+    println!("Corner product: {}", corner_product);
+
+    let rows = assemble_tiles(corners[0], &tiles, &tiles_with_side);
+
+    let mut image = Vec::new();
+    for row in &rows {
+        let mut lines = vec![Vec::new(); TILE_SIZE - 2];
+        for (tile_id, transform) in row {
+            let tile = &tiles[tile_id];
+            let tile_image = transform_image(&tile.image, *transform);
+            for line in 0..TILE_SIZE - 2 {
+                lines[line].extend_from_slice(&tile_image[line]);
+            }
+        }
+        image.append(&mut lines);
+    }
+
+    let pattern = [
+        b"                  # ",
+        b"#    ##    ##    ###",
+        b" #  #  #  #  #  #   ",
+    ];
+
+    for transform_bits in 0..8 {
+        let transform = Transform::from_bits(transform_bits)
+            .expect("Failed to convert transform bits into Transform");
+
+        let mut instance_count = 0;
+
+        let transformed_image = transform_image(&image, transform);
+
+        for origin_row in 0..image.len() - (pattern.len() - 1) {
+            for origin_column in 0..image.len() - (pattern[0].len() - 1) {
+                let mut all_found = true;
+                for row in 0..pattern.len() {
+                    for column in 0..pattern[0].len() {
+                        if pattern[row][column] == b'#'
+                            && transformed_image[origin_row + row][origin_column + column] != b'#'
+                        {
+                            all_found = false;
+                            break;
+                        }
+                    }
+
+                    if !all_found {
+                        break;
+                    }
+                }
+
+                if all_found {
+                    instance_count += 1;
+                }
+            }
+        }
+
+        if instance_count > 0 {
+            let pattern_hash_count = pattern
+                .iter()
+                .flat_map(|row| row.iter())
+                .filter(|byte| **byte == b'#')
+                .count();
+
+            let image_hash_count = transformed_image
+                .iter()
+                .flat_map(|row| row.iter())
+                .filter(|byte| **byte == b'#')
+                .count();
+
+            println!(
+                "Water roughness: {}",
+                image_hash_count - pattern_hash_count * instance_count
+            );
+            break;
+        }
     }
 }
 
