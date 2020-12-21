@@ -166,6 +166,7 @@ version = "0.1.0"
 name = "day-20"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "clap",
  "common",
 ]

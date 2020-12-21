@@ -1,12 +1,22 @@
 #![deny(clippy::all, clippy::pedantic)]
 #![feature(test)]
 
+#[macro_use]
+extern crate bitflags;
 extern crate test;
 
 use std::{collections::HashMap, convert::TryInto};
 
 use clap::{crate_name, App, Arg};
 use common::LineReader;
+
+bitflags! {
+    struct Transform: u8 {
+        const Rotate90 = 1 << 0;
+        const FlipHorizontal = 1 << 1;
+        const FlipVertical = 1 << 2;
+    }
+}
 
 const TILE_SIZE: usize = 10;
 
@@ -28,17 +38,6 @@ impl Side {
             _ => panic!("Unexpected index {}", i),
         }
     }
-}
-
-enum Transformation {
-    None,
-    Rotate90,
-    Rotate180,
-    Rotate270,
-    FlipH,
-    Rotate90FlipH,
-    Rotate180FlipH,
-    Rotate270FlipH,
 }
 
 #[derive(Debug)]
@@ -97,66 +96,51 @@ impl Tile {
         unique_sides
     }
 
-    fn get_side_after_transformation(
-        &self,
-        transformation: Transformation,
-        side: Side,
-    ) -> [u8; TILE_SIZE] {
-        let (source, reverse) = match side {
-            Side::Left => match transformation {
-                Transformation::None => (Side::Left, false),
-                Transformation::Rotate90 => (Side::Bottom, false),
-                Transformation::Rotate180 => (Side::Right, true),
-                Transformation::Rotate270 => (Side::Top, true),
-                Transformation::FlipH => (Side::Right, false),
-                Transformation::Rotate90FlipH => (Side::Top, false),
-                Transformation::Rotate180FlipH => (Side::Left, true),
-                Transformation::Rotate270FlipH => (Side::Bottom, true),
-            },
-            Side::Top => match transformation {
-                Transformation::None => (Side::Top, false),
-                Transformation::Rotate90 => (Side::Left, true),
-                Transformation::Rotate180 => (Side::Bottom, true),
-                Transformation::Rotate270 => (Side::Right, false),
-                Transformation::FlipH => (Side::Top, true),
-                Transformation::Rotate90FlipH => (Side::Left, false),
-                Transformation::Rotate180FlipH => (Side::Bottom, false),
-                Transformation::Rotate270FlipH => (Side::Right, true),
-            },
-            Side::Right => match transformation {
-                Transformation::None => (Side::Right, false),
-                Transformation::Rotate90 => (Side::Top, false),
-                Transformation::Rotate180 => (Side::Left, true),
-                Transformation::Rotate270 => (Side::Bottom, true),
-                Transformation::FlipH => (Side::Left, false),
-                Transformation::Rotate90FlipH => (Side::Bottom, false),
-                Transformation::Rotate180FlipH => (Side::Right, true),
-                Transformation::Rotate270FlipH => (Side::Top, true),
-            },
-            Side::Bottom => match transformation {
-                Transformation::None => (Side::Bottom, false),
-                Transformation::Rotate90 => (Side::Right, true),
-                Transformation::Rotate180 => (Side::Top, true),
-                Transformation::Rotate270 => (Side::Left, false),
-                Transformation::FlipH => (Side::Bottom, true),
-                Transformation::Rotate90FlipH => (Side::Right, false),
-                Transformation::Rotate180FlipH => (Side::Top, false),
-                Transformation::Rotate270FlipH => (Side::Left, true),
-            },
-        };
+    fn get_side_after_transform(&self, mut side: Side, transform: Transform) -> [u8; TILE_SIZE] {
+        let mut reverse = false;
 
-        let mut source_data = self.sides[source as usize].clone();
-        if reverse {
-            source_data.reverse();
+        if transform.contains(Transform::FlipVertical) {
+            reverse = match side {
+                Side::Left | Side::Right => !reverse,
+                _ => reverse,
+            };
+            side = match side {
+                Side::Top => Side::Bottom,
+                Side::Bottom => Side::Top,
+                _ => side,
+            };
         }
-        source_data
+
+        if transform.contains(Transform::FlipHorizontal) {
+            reverse = match side {
+                Side::Top | Side::Bottom => !reverse,
+                _ => reverse,
+            };
+            side = match side {
+                Side::Left => Side::Right,
+                Side::Right => Side::Left,
+                _ => side,
+            };
+        }
+
+        if transform.contains(Transform::Rotate90) {
+            reverse = match side {
+                Side::Left | Side::Right => !reverse,
+                _ => reverse,
+            };
+            side = Side::from_index((((side as u8) + 3) % 4) as usize);
+        }
+
+        let mut side_bytes = self.sides[side as usize].clone();
+        if reverse {
+            side_bytes.reverse();
+        }
+        side_bytes
     }
 
-    /*
-    fn get_transformations_matching_constraints(&self, Vec<>) -> Vec<Transformation> {
+    fn get_transform_to_match_side() -> Transform {
 
     }
-    */
 }
 
 fn main() {
@@ -214,6 +198,13 @@ fn main() {
 
         tile.sides_with_neighbors = sides_with_neighbors;
     }
+
+    let mut counts = HashMap::new();
+    for (_, tiles) in tiles_with_side {
+        *counts.entry(tiles.len()).or_insert(0) += 1;
+    }
+
+    println!("{:?}", counts);
 
     println!("Corner product: {}", corner_product);
 }
