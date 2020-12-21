@@ -181,32 +181,43 @@ impl Tile {
     }
 }
 
+struct TransformedTile {
+    id: u16,
+    transform: Transform,
+}
+
 fn assemble_tiles(
     top_left_corner_id: u16,
     tiles: &HashMap<u16, Tile>,
     tiles_with_side: &HashMap<[u8; TILE_SIZE], Vec<u16>>,
-) -> Vec<Vec<(u16, Transform)>> {
-    let top_left_tile = &tiles[&top_left_corner_id];
-    let transform_to_be_top_left = top_left_tile.get_transform_to_be_top_left();
-
+) -> Vec<Vec<TransformedTile>> {
     let mut rows = Vec::new();
+
     let mut first_row = Vec::new();
-    first_row.push((top_left_tile.id, transform_to_be_top_left));
+    first_row.push(TransformedTile {
+        id: tiles[&top_left_corner_id].id,
+        transform: tiles[&top_left_corner_id].get_transform_to_be_top_left(),
+    });
+
     loop {
-        let (previous_tile_id, previous_tile_transform) =
-            first_row.last().expect("Failed to find previous tile");
-        let previous_tile = &tiles[previous_tile_id];
+        let previous = first_row.last().expect("Failed to find previous tile");
+        let previous_tile = &tiles[&previous.id];
 
         let previous_right_side =
-            previous_tile.get_side_after_transform(Side::Right, *previous_tile_transform);
-        if let Some(current_tile_id) = tiles_with_side[&previous_right_side]
-            .iter()
-            .find(|id| **id != *previous_tile_id)
-        {
-            let current_tile = &tiles[current_tile_id];
-            let current_tile_transform =
+            previous_tile.get_side_after_transform(Side::Right, previous.transform);
+        if let Some(current_tile) = tiles_with_side[&previous_right_side].iter().find_map(|id| {
+            if *id == previous_tile.id {
+                None
+            } else {
+                Some(&tiles[id])
+            }
+        }) {
+            let current_transform =
                 current_tile.get_transform_to_match_side(Side::Left, &previous_right_side);
-            first_row.push((*current_tile_id, current_tile_transform));
+            first_row.push(TransformedTile {
+                id: current_tile.id,
+                transform: current_transform,
+            });
         } else {
             break;
         }
@@ -223,19 +234,28 @@ fn assemble_tiles(
                 break;
             }
 
-            let (previous_tile_id, previous_tile_transform) = &last_row[column_index];
-            let previous_tile = &tiles[previous_tile_id];
+            let previous = &last_row[column_index];
+            let previous_tile = &tiles[&previous.id];
 
             let previous_bottom_side =
-                previous_tile.get_side_after_transform(Side::Bottom, *previous_tile_transform);
-            if let Some(current_tile_id) = tiles_with_side[&previous_bottom_side]
-                .iter()
-                .find(|id| **id != *previous_tile_id)
+                previous_tile.get_side_after_transform(Side::Bottom, previous.transform);
+            if let Some(current_tile) =
+                tiles_with_side[&previous_bottom_side]
+                    .iter()
+                    .find_map(|id| {
+                        if *id == previous_tile.id {
+                            None
+                        } else {
+                            Some(&tiles[id])
+                        }
+                    })
             {
-                let current_tile = &tiles[current_tile_id];
-                let current_tile_transform =
+                let current_transform =
                     current_tile.get_transform_to_match_side(Side::Top, &previous_bottom_side);
-                row.push((*current_tile_id, current_tile_transform));
+                row.push(TransformedTile {
+                    id: current_tile.id,
+                    transform: current_transform,
+                });
             } else {
                 break;
             }
@@ -326,9 +346,9 @@ fn main() {
     let mut image = Vec::new();
     for row in &rows {
         let mut lines = vec![Vec::new(); TILE_SIZE - 2];
-        for (tile_id, transform) in row {
-            let tile = &tiles[tile_id];
-            let tile_image = transform_image(&tile.image, *transform);
+        for placed_tile in row {
+            let tile = &tiles[&placed_tile.id];
+            let tile_image = transform_image(&tile.image, placed_tile.transform);
             for line in 0..TILE_SIZE - 2 {
                 lines[line].extend_from_slice(&tile_image[line]);
             }
