@@ -186,6 +186,12 @@ struct TransformedTile {
     transform: Transform,
 }
 
+impl TransformedTile {
+    fn new(id: u16, transform: Transform) -> Self {
+        Self { id, transform }
+    }
+}
+
 fn assemble_tiles(
     top_left_corner_id: u16,
     tiles: &HashMap<u16, Tile>,
@@ -194,10 +200,10 @@ fn assemble_tiles(
     let mut rows = Vec::new();
 
     let mut first_row = Vec::new();
-    first_row.push(TransformedTile {
-        id: tiles[&top_left_corner_id].id,
-        transform: tiles[&top_left_corner_id].get_transform_to_be_top_left(),
-    });
+    first_row.push(TransformedTile::new(
+        tiles[&top_left_corner_id].id,
+        tiles[&top_left_corner_id].get_transform_to_be_top_left(),
+    ));
 
     loop {
         let previous = first_row.last().expect("Failed to find previous tile");
@@ -214,10 +220,7 @@ fn assemble_tiles(
         }) {
             let current_transform =
                 current_tile.get_transform_to_match_side(Side::Left, &previous_right_side);
-            first_row.push(TransformedTile {
-                id: current_tile.id,
-                transform: current_transform,
-            });
+            first_row.push(TransformedTile::new(current_tile.id, current_transform));
         } else {
             break;
         }
@@ -252,10 +255,7 @@ fn assemble_tiles(
             {
                 let current_transform =
                     current_tile.get_transform_to_match_side(Side::Top, &previous_bottom_side);
-                row.push(TransformedTile {
-                    id: current_tile.id,
-                    transform: current_transform,
-                });
+                row.push(TransformedTile::new(current_tile.id, current_transform));
             } else {
                 break;
             }
