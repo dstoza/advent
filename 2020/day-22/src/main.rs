@@ -3,7 +3,7 @@
 
 extern crate test;
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use clap::{crate_name, App, Arg};
 use common::LineReader;
@@ -37,7 +37,7 @@ fn play_basic_game(mut player1: VecDeque<u8>, mut player2: VecDeque<u8>) -> usiz
 }
 
 fn play_recursive_game(mut player1: VecDeque<u8>, mut player2: VecDeque<u8>) -> (i8, usize) {
-    let mut previous_rounds = BTreeSet::new();
+    let mut previous_rounds = HashSet::new();
 
     loop {
         let concatenated: Vec<_> = player1
