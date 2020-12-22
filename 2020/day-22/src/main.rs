@@ -3,7 +3,10 @@
 
 extern crate test;
 
-use std::collections::{HashSet, VecDeque};
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet, VecDeque},
+    hash::{Hash, Hasher},
+};
 
 use clap::{crate_name, App, Arg};
 use common::LineReader;
@@ -36,22 +39,30 @@ fn play_basic_game(mut player1: VecDeque<u8>, mut player2: VecDeque<u8>) -> usiz
     }
 }
 
-fn play_recursive_game(mut player1: VecDeque<u8>, mut player2: VecDeque<u8>) -> (i8, usize) {
+fn play_recursive_game(
+    mut player1: VecDeque<u8>,
+    mut player2: VecDeque<u8>,
+    needs_score: bool,
+) -> (i8, usize) {
     let mut previous_rounds = HashSet::new();
 
     loop {
-        let concatenated: Vec<_> = player1
-            .iter()
-            .chain(std::iter::once(&u8::max_value()))
-            .chain(player2.iter())
-            .copied()
-            .collect();
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            player1.hash(&mut hasher);
+            player2.hash(&mut hasher);
+            hasher.finish()
+        };
 
-        if previous_rounds.contains(&concatenated) {
+        if previous_rounds.contains(&hash) {
             return (1, 0);
         }
 
-        previous_rounds.insert(concatenated);
+        previous_rounds.insert(hash);
+
+        if !needs_score && player1.iter().max() > player2.iter().max() {
+            return (1, 0);
+        }
 
         let card1 = player1.pop_front().unwrap();
         let card2 = player2.pop_front().unwrap();
@@ -60,6 +71,7 @@ fn play_recursive_game(mut player1: VecDeque<u8>, mut player2: VecDeque<u8>) -> 
             let (winner, _) = play_recursive_game(
                 player1.iter().take(card1 as usize).copied().collect(),
                 player2.iter().take(card2 as usize).copied().collect(),
+                false,
             );
             winner
         } else if card1 > card2 {
@@ -124,7 +136,7 @@ fn main() {
         play_basic_game(player1.clone(), player2.clone())
     );
 
-    let (_winner, score) = play_recursive_game(player1, player2);
+    let (_winner, score) = play_recursive_game(player1, player2, true);
     println!("Recursive game score: {}", score);
 }
 
