@@ -3,27 +3,7 @@
 
 extern crate test;
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::{Rc, Weak},
-};
-
 use clap::{crate_name, App, Arg};
-
-struct ListNode {
-    value: u32,
-    next: Weak<RefCell<ListNode>>,
-}
-
-impl ListNode {
-    fn new(value: u32) -> Self {
-        Self {
-            value,
-            next: Weak::new(),
-        }
-    }
-}
 
 fn main() {
     let args = App::new(crate_name!())
@@ -31,120 +11,85 @@ fn main() {
         .arg(Arg::from_usage("<STEPS>"))
         .get_matches();
 
-    let mut cups = HashMap::new();
+    let mut next_cup = Vec::new();
+    next_cup.resize(1_000_001, 0);
 
     let mut max = 0;
-    let mut head = None;
-    let mut tail: Option<Rc<RefCell<ListNode>>> = None;
+    let mut head = 0;
+    let mut tail = 0;
     for value in args.value_of("INPUT").unwrap().chars().map(|character| {
         String::from(character)
-            .parse::<u32>()
+            .parse::<usize>()
             .expect("Failed to parse cup as u8")
     }) {
         max = max.max(value);
-        let cup = Rc::new(RefCell::new(ListNode::new(value)));
-        cups.insert(value, cup.clone());
-        if let None = head {
-            head = Some(cup.clone());
+        if head == 0 {
+            head = value;
         }
-        match &mut tail {
-            Some(tail_node) => {
-                tail_node.borrow_mut().next = Rc::downgrade(&cup);
-                tail = Some(cup.clone());
-            }
-            None => {
-                tail = Some(cup.clone());
-            }
+        if tail != 0 {
+            next_cup[tail] = value;
         }
+        tail = value;
     }
 
     // let cup_count = max;
 
     let cup_count = 1_000_000;
     for value in max + 1..=cup_count {
-        let cup = Rc::new(RefCell::new(ListNode::new(value)));
-        if let Some(tail_node) = &mut tail {
-            tail_node.borrow_mut().next = Rc::downgrade(&cup);
-            tail = Some(cup.clone());
-        }
-        cups.insert(value, cup);
+        next_cup[tail] = value;
+        tail = value;
     }
 
     // Complete the circular list
-    let head = head.unwrap();
-    let tail = tail.unwrap();
-    tail.borrow_mut().next = Rc::downgrade(&head);
+    next_cup[tail] = head;
 
     let steps: usize = args.value_of("STEPS").unwrap().parse().unwrap();
 
-    let mut current = head.clone();
+    let mut current = head;
     for _ in 0..steps {
+        let mut destination = (current + cup_count - 2) % cup_count + 1;
+
+        let mut picker = current;
         let mut picked_up = Vec::new();
-        let pickup_head = current.borrow().next.upgrade().unwrap();
-        picked_up.push(pickup_head.borrow().value);
-        let mut pickup_tail = pickup_head.borrow().next.upgrade().unwrap();
-        picked_up.push(pickup_tail.borrow().value);
-        let next = pickup_tail.borrow().next.upgrade().unwrap();
-        pickup_tail = next;
-        picked_up.push(pickup_tail.borrow().value);
-        current.borrow_mut().next = pickup_tail.borrow().next.clone();
+        for _ in 0..3 {
+            picker = next_cup[picker];
+            picked_up.push(picker);
+        }
+        next_cup[current] = next_cup[picker];
 
         // println!("Picked up: {:?}", picked_up);
 
-        let mut destination = (current.borrow().value + cup_count - 2) % cup_count + 1;
         while picked_up.iter().any(|value| *value == destination) {
             destination = (destination + cup_count - 2) % cup_count + 1
         }
 
         // println!("Destination: {}", destination);
 
-        let destination_node = &cups[&destination];
-        let destination_next = destination_node.borrow().next.clone();
-        destination_node.borrow_mut().next = Rc::downgrade(&pickup_head);
-        pickup_tail.borrow_mut().next = destination_next;
+        let destination_next = next_cup[destination];
+        next_cup[destination] = *picked_up.first().unwrap();
+        next_cup[*picked_up.last().unwrap()] = destination_next;
 
-        let next = current.borrow().next.clone();
-        current = next.upgrade().unwrap();
+        current = next_cup[current];
     }
 
-    while current.borrow().value != 1 {
-        let next = current.borrow().next.upgrade().unwrap();
-        current = next;
+    while current != 1 {
+        current = next_cup[current];
     }
 
-    let next = current.borrow().next.upgrade().unwrap();
-    current = next;
+    current = next_cup[current];
 
     let mut product = 1;
     for _ in 0..2 {
-        product *= current.borrow().value as u64;
-        let next = current.borrow().next.upgrade().unwrap();
-        current = next;
+        product *= current as u64;
+        current = next_cup[current];
     }
 
     println!("Product: {}", product);
 
     /*
-
-
-    while current.borrow().value != 1 {
-        print!("{}", current.borrow().value);
-        let next = current.borrow().next.upgrade().unwrap();
-        current = next;
-    }
-    
-    println!();
-    */
-
-    /*
-    let mut cursor = 0;
-    while cups[cursor] != 1 {
-        cursor += 1;
-    }
-    cursor += 1;
     for _ in 0..cup_count - 1 {
-        print!("{}", cups[cursor]);
-        cursor = (cursor + 1) % cup_count;
+        print!("{}", current);
+        current = next_cup[current];
     }
     println!();
     */
