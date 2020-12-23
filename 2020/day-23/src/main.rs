@@ -50,10 +50,10 @@ fn main() {
         let mut destination = (current + cup_count - 2) % cup_count + 1;
 
         let mut picker = current;
-        let mut picked_up = Vec::new();
-        for _ in 0..3 {
+        let mut picked_up = [0; 3];
+        for i in 0..3 {
             picker = next_cup[picker];
-            picked_up.push(picker);
+            picked_up[i] = picker;
         }
         next_cup[current] = next_cup[picker];
 
