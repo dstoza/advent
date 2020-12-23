@@ -47,27 +47,22 @@ fn main() {
 
     let mut current = head;
     for _ in 0..steps {
-        let mut destination = (current + cup_count - 2) % cup_count + 1;
-
-        let mut picker = current;
-        let mut picked_up = [0; 3];
-        for i in 0..3 {
-            picker = next_cup[picker];
-            picked_up[i] = picker;
+        let mut pick_cursor = current;
+        let mut picked = [0; 3];
+        for pick in &mut picked {
+            pick_cursor = next_cup[pick_cursor];
+            *pick = pick_cursor;
         }
-        next_cup[current] = next_cup[picker];
+        next_cup[current] = next_cup[pick_cursor];
 
-        // println!("Picked up: {:?}", picked_up);
-
-        while picked_up.iter().any(|value| *value == destination) {
+        let mut destination = (current + cup_count - 2) % cup_count + 1;
+        while picked.iter().any(|value| *value == destination) {
             destination = (destination + cup_count - 2) % cup_count + 1
         }
 
-        // println!("Destination: {}", destination);
-
         let destination_next = next_cup[destination];
-        next_cup[destination] = *picked_up.first().unwrap();
-        next_cup[*picked_up.last().unwrap()] = destination_next;
+        next_cup[destination] = picked[0];
+        next_cup[picked[picked.len() - 1]] = destination_next;
 
         current = next_cup[current];
     }
@@ -78,14 +73,6 @@ fn main() {
 
     current = next_cup[current];
 
-    let mut product = 1;
-    for _ in 0..2 {
-        product *= current as u64;
-        current = next_cup[current];
-    }
-
-    println!("Product: {}", product);
-
     /*
     for _ in 0..cup_count - 1 {
         print!("{}", current);
@@ -93,6 +80,14 @@ fn main() {
     }
     println!();
     */
+
+    let mut product = 1;
+    for _ in 0..2 {
+        product *= current as u64;
+        current = next_cup[current];
+    }
+
+    println!("Product: {}", product);
 }
 
 #[cfg(test)]
