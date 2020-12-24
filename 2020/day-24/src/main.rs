@@ -172,9 +172,7 @@ fn evolve_tiles(black_tiles: &mut HashSet<Coordinate>) {
     }
 
     for tile_to_flip in tiles_to_flip {
-        if black_tiles.contains(&tile_to_flip) {
-            black_tiles.remove(&tile_to_flip);
-        } else {
+        if !black_tiles.remove(&tile_to_flip) {
             black_tiles.insert(tile_to_flip);
         }
     }
@@ -190,9 +188,7 @@ fn main() {
     let mut reader = LineReader::new(args.value_of("FILE").unwrap());
     reader.read_with(|line| {
         let coordinate = get_coordinate(line);
-        if black_tiles.contains(&coordinate) {
-            black_tiles.remove(&coordinate);
-        } else {
+        if !black_tiles.remove(&coordinate) {
             black_tiles.insert(coordinate);
         }
     });
