@@ -78,7 +78,7 @@ impl<'a> Iterator for DirectionIterator<'a> {
                     _ => panic!("Unexpected character after 'n': {}", next),
                 }
             }
-            _ => panic!("Unxpected first character: {}", first),
+            _ => panic!("Unexpected first character: {}", first),
         }
     }
 }
@@ -198,7 +198,6 @@ fn main() {
     let days = 100;
     for _day in 1..=days {
         evolve_tiles(&mut black_tiles);
-        // println!("After day {}, {} tiles are black", day, black_tiles.len());
     }
 
     println!("After {} days, {} tiles are black", days, black_tiles.len());
@@ -206,5 +205,5 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use test::Bencher;
+    // use test::Bencher;
 }
