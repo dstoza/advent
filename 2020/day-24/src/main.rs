@@ -85,8 +85,8 @@ impl<'a> Iterator for DirectionIterator<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Coordinate {
-    x: i32,
-    y: i32,
+    x: i16,
+    y: i16,
 }
 
 impl Coordinate {
@@ -126,15 +126,15 @@ fn get_coordinate(line: &str) -> Coordinate {
     coordinate
 }
 
-fn get_adjacent_tiles(coordinate: &Coordinate) -> [Coordinate; 6] {
-    let mut adjacent_tiles = [coordinate.clone(); 6];
-    for (index, direction) in (0..6).map(|index| Direction::from_index(index)).enumerate() {
+fn get_adjacent_tiles(coordinate: Coordinate) -> [Coordinate; 6] {
+    let mut adjacent_tiles = [coordinate; 6];
+    for (index, direction) in (0..6).map(Direction::from_index).enumerate() {
         adjacent_tiles[index].step(&direction);
     }
     adjacent_tiles
 }
 
-fn count_adjacent_black_tiles(coordinate: &Coordinate, black_tiles: &HashSet<Coordinate>) -> usize {
+fn count_adjacent_black_tiles(coordinate: Coordinate, black_tiles: &HashSet<Coordinate>) -> usize {
     let adjacent_tiles = get_adjacent_tiles(coordinate);
     let mut count = 0;
     for adjacent_tile in &adjacent_tiles {
@@ -153,19 +153,19 @@ fn evolve_tiles(black_tiles: &mut HashSet<Coordinate>) {
     let mut white_tiles = HashSet::new();
 
     for black_tile in black_tiles.iter() {
-        let adjacent_black_tile_count = count_adjacent_black_tiles(black_tile, black_tiles);
+        let adjacent_black_tile_count = count_adjacent_black_tiles(*black_tile, black_tiles);
         if adjacent_black_tile_count == 0 || adjacent_black_tile_count > 2 {
             tiles_to_flip.push(*black_tile);
         }
 
-        for adjacent_tile in get_adjacent_tiles(black_tile).iter() {
+        for adjacent_tile in &get_adjacent_tiles(*black_tile) {
             white_tiles.insert(*adjacent_tile);
         }
     }
 
     white_tiles = white_tiles.difference(&black_tiles).copied().collect();
-    for white_tile in white_tiles.iter() {
-        let adjacent_black_tile_count = count_adjacent_black_tiles(white_tile, black_tiles);
+    for white_tile in &white_tiles {
+        let adjacent_black_tile_count = count_adjacent_black_tiles(*white_tile, black_tiles);
         if adjacent_black_tile_count == 2 {
             tiles_to_flip.push(*white_tile);
         }
