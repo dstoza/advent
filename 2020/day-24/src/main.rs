@@ -3,8 +3,9 @@
 
 extern crate test;
 
-use std::collections::HashSet;
+use std::convert::TryInto;
 
+use bit_set::BitSet;
 use clap::{crate_name, App, Arg};
 use common::LineReader;
 
@@ -85,13 +86,23 @@ impl<'a> Iterator for DirectionIterator<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Coordinate {
-    x: i16,
-    y: i16,
+    x: i8,
+    y: i8,
 }
 
 impl Coordinate {
     fn new() -> Self {
         Self { x: 0, y: 0 }
+    }
+
+    fn from_address(address: usize) -> Self {
+        let x: i16 = ((address >> 8) & 0xFF).try_into().unwrap();
+        let y: i16 = (address & 0xFF).try_into().unwrap();
+
+        Self {
+            x: (x - 128).try_into().unwrap(),
+            y: (y - 128).try_into().unwrap(),
+        }
     }
 
     fn step(&mut self, direction: &Direction) {
@@ -116,6 +127,12 @@ impl Coordinate {
             }
         }
     }
+
+    fn get_address(self) -> u16 {
+        let high_byte: u16 = (i16::from(self.x) + 128).try_into().unwrap();
+        let low_byte: u16 = (i16::from(self.y) + 128).try_into().unwrap();
+        high_byte << 8 | low_byte
+    }
 }
 
 fn get_coordinate(line: &str) -> Coordinate {
@@ -134,11 +151,11 @@ fn get_adjacent_tiles(coordinate: Coordinate) -> [Coordinate; 6] {
     adjacent_tiles
 }
 
-fn count_adjacent_black_tiles(coordinate: Coordinate, black_tiles: &HashSet<Coordinate>) -> usize {
+fn count_adjacent_black_tiles(coordinate: Coordinate, black_tiles: &BitSet) -> usize {
     let adjacent_tiles = get_adjacent_tiles(coordinate);
     let mut count = 0;
     for adjacent_tile in &adjacent_tiles {
-        if black_tiles.contains(adjacent_tile) {
+        if black_tiles.contains(adjacent_tile.get_address() as usize) {
             count += 1;
             if count > 2 {
                 return count;
@@ -148,31 +165,33 @@ fn count_adjacent_black_tiles(coordinate: Coordinate, black_tiles: &HashSet<Coor
     count
 }
 
-fn evolve_tiles(black_tiles: &mut HashSet<Coordinate>) {
+fn evolve_tiles(black_tiles: &mut BitSet) {
     let mut tiles_to_flip = Vec::new();
-    let mut white_tiles = HashSet::new();
+    let mut white_tiles = BitSet::new();
 
     for black_tile in black_tiles.iter() {
-        let adjacent_black_tile_count = count_adjacent_black_tiles(*black_tile, black_tiles);
+        let coordinate = Coordinate::from_address(black_tile);
+        let adjacent_black_tile_count = count_adjacent_black_tiles(coordinate, black_tiles);
         if adjacent_black_tile_count == 0 || adjacent_black_tile_count > 2 {
-            tiles_to_flip.push(*black_tile);
+            tiles_to_flip.push(black_tile);
         }
 
-        for adjacent_tile in &get_adjacent_tiles(*black_tile) {
-            white_tiles.insert(*adjacent_tile);
+        for adjacent_tile in &get_adjacent_tiles(coordinate) {
+            white_tiles.insert(adjacent_tile.get_address() as usize);
         }
     }
 
-    white_tiles = white_tiles.difference(&black_tiles).copied().collect();
+    white_tiles.difference_with(black_tiles);
     for white_tile in &white_tiles {
-        let adjacent_black_tile_count = count_adjacent_black_tiles(*white_tile, black_tiles);
+        let coordinate = Coordinate::from_address(white_tile);
+        let adjacent_black_tile_count = count_adjacent_black_tiles(coordinate, black_tiles);
         if adjacent_black_tile_count == 2 {
-            tiles_to_flip.push(*white_tile);
+            tiles_to_flip.push(white_tile);
         }
     }
 
     for tile_to_flip in tiles_to_flip {
-        if !black_tiles.remove(&tile_to_flip) {
+        if !black_tiles.remove(tile_to_flip) {
             black_tiles.insert(tile_to_flip);
         }
     }
@@ -183,13 +202,13 @@ fn main() {
         .arg(Arg::from_usage("<FILE>"))
         .get_matches();
 
-    let mut black_tiles = HashSet::new();
+    let mut black_tiles = BitSet::new();
 
     let mut reader = LineReader::new(args.value_of("FILE").unwrap());
     reader.read_with(|line| {
         let coordinate = get_coordinate(line);
-        if !black_tiles.remove(&coordinate) {
-            black_tiles.insert(coordinate);
+        if !black_tiles.remove(coordinate.get_address() as usize) {
+            black_tiles.insert(coordinate.get_address() as usize);
         }
     });
 
