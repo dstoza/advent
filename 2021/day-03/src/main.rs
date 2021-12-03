@@ -124,7 +124,7 @@ mod test {
     }
 
     #[test]
-    fn test_oxyten_generator_rating() {
+    fn test_oxygen_generator_rating() {
         let mut values: Vec<u16> = get_sample_input()
             .into_iter()
             .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
