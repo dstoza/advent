@@ -30,49 +30,38 @@ fn calculate_first_position(values: &[u16]) -> u16 {
     1u16 << (15 - leading_zeros)
 }
 
-fn calculate_oxygen_generator_rating(values: &[u16]) -> u16 {
+fn calculate_rating(values: &[u16], prefer_high: bool) -> u16 {
     let mut start = 0;
     let mut end = values.len() - 1;
     let mut position = calculate_first_position(values);
     while start != end {
         let middle = start + (end - start) / 2;
-        if (values[middle] & position) != 0 {
-            while (values[start] & position) == 0 && start != end {
-                start += 1;
-            }
-        } else if (end - start) % 2 == 1 && (values[middle + 1] & position) != 0 {
-            // Tiebreaker if there are an equal number of elements
-            start = middle + 1;
-        } else {
-            while (values[end] & position) != 0 && end != start {
-                end -= 1;
-            }
-        }
-        position >>= 1;
-    }
-    values[start]
-}
 
-fn calculate_co2_scrubber_rating(values: &[u16]) -> u16 {
-    let mut start = 0;
-    let mut end = values.len() - 1;
-    let mut position = calculate_first_position(values);
-    while start != end {
-        let middle = start + (end - start) / 2;
-        if (values[middle] & position) != 0 {
-            while (values[end] & position) != 0 && end != start {
-                end -= 1;
+        // Check the tiebreaker first (if there are an equal number of elements)
+        if (end - start) % 2 == 1 && (values[middle] ^ values[middle + 1]) & position != 0 {
+            if prefer_high {
+                start = middle + 1;
+            } else {
+                end = middle;
             }
-        } else if (end - start) % 2 == 1 && (values[middle + 1] & position) != 0 {
-            // Tiebreaker if there are an equal number of elements
-            end = middle;
-        } else {
+            position >>= 1;
+            continue;
+        }
+
+        let desired_value = if prefer_high { position } else { 0 };
+        if values[middle] & position == desired_value {
             while (values[start] & position) == 0 && start != end {
                 start += 1;
             }
+        } else {
+            while (values[end] & position) != 0 && end != start {
+                end -= 1;
+            }
         }
+
         position >>= 1;
     }
+
     values[start]
 }
 
@@ -81,8 +70,10 @@ fn calculate_life_support_rating<I: Iterator<Item = String>>(lines: I) -> u32 {
         .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
         .collect();
     values.sort_unstable();
-    calculate_oxygen_generator_rating(values.as_ref()) as u32
-        * calculate_co2_scrubber_rating(values.as_ref()) as u32
+
+    let oxygen_generator_rating = calculate_rating(values.as_ref(), true) as u32;
+    let co2_scrubber_rating = calculate_rating(values.as_ref(), false) as u32;
+    oxygen_generator_rating * co2_scrubber_rating
 }
 
 fn main() {
@@ -130,7 +121,7 @@ mod test {
             .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
             .collect();
         values.sort();
-        assert_eq!(calculate_oxygen_generator_rating(values.as_ref()), 23);
+        assert_eq!(calculate_rating(values.as_ref(), true), 23);
     }
 
     #[test]
@@ -140,6 +131,6 @@ mod test {
             .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
             .collect();
         values.sort();
-        assert_eq!(calculate_co2_scrubber_rating(values.as_ref()), 10);
+        assert_eq!(calculate_rating(values.as_ref(), false), 10);
     }
 }
