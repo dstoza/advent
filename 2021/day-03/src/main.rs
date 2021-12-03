@@ -30,39 +30,41 @@ fn calculate_first_position(values: &[u16]) -> u16 {
     1u16 << (15 - leading_zeros)
 }
 
-fn calculate_rating(values: &[u16], prefer_high: bool) -> u16 {
-    let mut start = 0;
-    let mut end = values.len() - 1;
-    let mut position = calculate_first_position(values);
-    while start != end {
-        let middle = start + (end - start) / 2;
+fn calculate_rating(prefer_high: bool, values: &[u16], position: Option<u16>) -> u16 {
+    let position = match position {
+        Some(position) => position,
+        None => calculate_first_position(values),
+    };
 
-        // Check the tiebreaker first (if there are an equal number of elements)
-        if (end - start) % 2 == 1 && (values[middle] ^ values[middle + 1]) & position != 0 {
-            if prefer_high {
-                start = middle + 1;
-            } else {
-                end = middle;
-            }
-            position >>= 1;
-            continue;
-        }
-
-        let desired_value = if prefer_high { position } else { 0 };
-        if values[middle] & position == desired_value {
-            while (values[start] & position) == 0 && start != end {
-                start += 1;
-            }
-        } else {
-            while (values[end] & position) != 0 && end != start {
-                end -= 1;
-            }
-        }
-
-        position >>= 1;
+    if values.len() == 1 {
+        return values[0];
     }
 
-    values[start]
+    let middle = values.len() / 2;
+
+    // Check the tiebreaker first (if there are an equal number of elements)
+    if values.len() % 2 == 0 && (values[middle - 1] ^ values[middle]) & position != 0 {
+        if prefer_high {
+            return calculate_rating(prefer_high, &values[middle..], Some(position >> 1));
+        } else {
+            return calculate_rating(prefer_high, &values[..middle], Some(position >> 1));
+        }
+    }
+
+    let desired_value = if prefer_high { position } else { 0 };
+    if values[middle] & position == desired_value {
+        let mut start = 0;
+        while (values[start] & position) == 0 {
+            start += 1;
+        }
+        calculate_rating(prefer_high, &values[start..], Some(position >> 1))
+    } else {
+        let mut end = values.len() - 1;
+        while (values[end] & position) != 0 {
+            end -= 1;
+        }
+        calculate_rating(prefer_high, &values[..=end], Some(position >> 1))
+    }
 }
 
 fn calculate_life_support_rating<I: Iterator<Item = String>>(lines: I) -> u32 {
@@ -71,8 +73,8 @@ fn calculate_life_support_rating<I: Iterator<Item = String>>(lines: I) -> u32 {
         .collect();
     values.sort_unstable();
 
-    let oxygen_generator_rating = calculate_rating(values.as_ref(), true) as u32;
-    let co2_scrubber_rating = calculate_rating(values.as_ref(), false) as u32;
+    let oxygen_generator_rating = calculate_rating(true, values.as_ref(), None) as u32;
+    let co2_scrubber_rating = calculate_rating(false, values.as_ref(), None) as u32;
     oxygen_generator_rating * co2_scrubber_rating
 }
 
@@ -121,7 +123,7 @@ mod test {
             .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
             .collect();
         values.sort();
-        assert_eq!(calculate_rating(values.as_ref(), true), 23);
+        assert_eq!(calculate_rating(true, values.as_ref(), None), 23);
     }
 
     #[test]
@@ -131,6 +133,6 @@ mod test {
             .map(|s| u16::from_str_radix(s.as_ref(), 2).unwrap())
             .collect();
         values.sort();
-        assert_eq!(calculate_rating(values.as_ref(), false), 10);
+        assert_eq!(calculate_rating(false, values.as_ref(), None), 10);
     }
 }
