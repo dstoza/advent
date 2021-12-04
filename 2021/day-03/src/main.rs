@@ -41,16 +41,6 @@ fn calculate_rating(prefer_high: bool, values: &[u16], position: Option<u16>) ->
     }
 
     let middle = values.len() / 2;
-
-    // Check the tiebreaker first (if there are an equal number of elements)
-    if values.len() % 2 == 0 && (values[middle - 1] ^ values[middle]) & position != 0 {
-        if prefer_high {
-            return calculate_rating(prefer_high, &values[middle..], Some(position >> 1));
-        } else {
-            return calculate_rating(prefer_high, &values[..middle], Some(position >> 1));
-        }
-    }
-
     let desired_value = if prefer_high { position } else { 0 };
     if values[middle] & position == desired_value {
         let mut start = 0;
