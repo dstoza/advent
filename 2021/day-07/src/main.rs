@@ -19,10 +19,25 @@ fn calculate_fuel_linear(
     lesser_end: usize,
     greater_start: usize,
 ) -> (i32, i32) {
-    let lesser_fuel = middle * (lesser_end + 1) as i32 - cumulative_sums[lesser_end];
-    let greater_fuel = cumulative_sums[cumulative_sums.len() - 1]
-        - cumulative_sums[greater_start - 1]
-        - middle * (cumulative_sums.len() - greater_start) as i32;
+    let lesser_fuel = if lesser_end > 0 {
+        middle * lesser_end as i32 - cumulative_sums[lesser_end - 1]
+    } else {
+        0
+    };
+
+    let sum_before_greater = if greater_start > 0 {
+        cumulative_sums[greater_start - 1]
+    } else {
+        0
+    };
+    let greater_fuel = if greater_start < cumulative_sums.len() - 1 {
+        cumulative_sums[cumulative_sums.len() - 1]
+            - sum_before_greater
+            - middle * (cumulative_sums.len() - greater_start) as i32
+    } else {
+        0
+    };
+
     (lesser_fuel, greater_fuel)
 }
 
@@ -36,7 +51,7 @@ fn calculate_fuel_triangle(
     lesser_end: usize,
     greater_start: usize,
 ) -> (i32, i32) {
-    let lesser_fuel = positions[0..=lesser_end]
+    let lesser_fuel = positions[0..lesser_end]
         .iter()
         .map(|position| get_triangle_value(middle - position))
         .sum();
@@ -51,17 +66,8 @@ fn find_minimal_fuel(positions: &[i32], use_triangle_fuel_consumption: bool) -> 
     let cumulative_sums = get_cumulative_sums(positions);
 
     let mut middle = positions[positions.len() / 2];
-    let split_point = positions.len() / 2;
-
-    let mut lesser_end = split_point;
-    while positions[lesser_end] >= middle {
-        lesser_end -= 1;
-    }
-
-    let mut greater_start = split_point;
-    while positions[greater_start] <= middle {
-        greater_start += 1;
-    }
+    let lesser_end = positions.partition_point(|x| *x < middle);
+    let greater_start = positions.partition_point(|x| *x <= middle);
 
     let (mut lesser_fuel, mut greater_fuel) = if use_triangle_fuel_consumption {
         calculate_fuel_triangle(positions, middle, lesser_end, greater_start)
@@ -73,29 +79,12 @@ fn find_minimal_fuel(positions: &[i32], use_triangle_fuel_consumption: bool) -> 
     loop {
         if lesser_fuel > greater_fuel {
             middle -= 1;
-
-            while positions[lesser_end] >= middle {
-                lesser_end -= 1;
-            }
-
-            while positions[greater_start] > middle {
-                greater_start -= 1;
-            }
-            // Fix up overshoot
-            greater_start += 1;
         } else {
             middle += 1;
-
-            while positions[lesser_end] < middle {
-                lesser_end += 1;
-            }
-            // Fix up overshoot
-            lesser_end -= 1;
-
-            while positions[greater_start] <= middle {
-                greater_start += 1;
-            }
         }
+
+        let lesser_end = positions.partition_point(|x| *x < middle);
+        let greater_start = positions.partition_point(|x| *x <= middle);
 
         let (lesser, greater) = if use_triangle_fuel_consumption {
             calculate_fuel_triangle(positions, middle, lesser_end, greater_start)
@@ -149,5 +138,17 @@ mod test {
         positions.sort_unstable();
         assert_eq!(find_minimal_fuel(positions.as_ref(), false), 37);
         assert_eq!(find_minimal_fuel(positions.as_ref(), true), 168);
+    }
+
+    #[test]
+    fn test_same() {
+        assert_eq!(find_minimal_fuel(&[10, 10, 10], false), 0);
+        assert_eq!(find_minimal_fuel(&[10, 10, 10], true), 0);
+    }
+
+    #[test]
+    fn test_single() {
+        assert_eq!(find_minimal_fuel(&[0], false), 0);
+        assert_eq!(find_minimal_fuel(&[0], true), 0);
     }
 }
