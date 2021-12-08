@@ -109,14 +109,14 @@ fn get_output_value(line: &str) -> i32 {
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-    // print!(
+    // println!(
     //     "Easy digits: {}",
     //     reader
     //         .lines()
     //         .map(|line| count_easy_digits(&line.unwrap()))
     //         .sum::<usize>()
     // );
-    print!(
+    println!(
         "Sum: {}",
         reader
             .lines()
