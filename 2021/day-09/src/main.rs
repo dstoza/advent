@@ -10,29 +10,29 @@ fn get_low_points(lines: &[Vec<u8>]) -> Vec<(usize, usize)> {
         .iter()
         .enumerate()
         .flat_map(|(row, line)| {
-            line.iter().enumerate().filter_map(move |(column, byte)| {
+            line.iter().enumerate().filter_map(move |(column, value)| {
                 // 9s can never be a low point
-                if *byte == b'9' {
+                if *value == b'9' {
                     return None;
                 }
 
                 // Check above
-                if row > 0 && lines[row - 1][column] <= *byte {
+                if row > 0 && lines[row - 1][column] <= *value {
                     return None;
                 }
 
                 // Check left
-                if column > 0 && *byte >= line[column - 1] {
+                if column > 0 && *value >= line[column - 1] {
                     return None;
                 }
 
                 // Check right
-                if column + 1 < line.len() && *byte >= line[column + 1] {
+                if column + 1 < line.len() && *value >= line[column + 1] {
                     return None;
                 }
 
                 // Check below
-                if row + 1 < lines.len() && lines[row + 1][column] <= *byte {
+                if row + 1 < lines.len() && lines[row + 1][column] <= *value {
                     return None;
                 }
 
