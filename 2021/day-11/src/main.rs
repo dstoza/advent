@@ -3,12 +3,11 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-fn flash_cell(lines: &mut [Vec<u8>], row: usize, column: usize) -> i32 {
+fn flash_cell(lines: &mut [Vec<u8>], row: usize, column: usize) {
     if lines[row][column] != 10 {
-        return 0;
+        return;
     }
 
-    let mut flashes = 1;
     for (row_delta, column_delta) in [
         (-1, -1),
         (-1, 0),
@@ -39,30 +38,27 @@ fn flash_cell(lines: &mut [Vec<u8>], row: usize, column: usize) -> i32 {
         let column = ((column as i32) + column_delta) as usize;
         let neighbor = &mut lines[row][column];
         *neighbor += 1;
-        flashes += flash_cell(lines, row, column);
+        flash_cell(lines, row, column);
     }
-
-    flashes
 }
 
 fn run_generation(lines: &mut [Vec<u8>]) -> i32 {
-    let mut flashes = 0;
-
     for row in 0..lines.len() {
         for column in 0..lines[0].len() {
             lines[row][column] += 1;
-            flashes += flash_cell(lines, row, column);
+            flash_cell(lines, row, column);
         }
     }
 
+    let mut flashes = 0;
     for line in lines {
         for cell in line {
             if *cell > 9 {
+                flashes += 1;
                 *cell = 0;
             }
         }
     }
-
     flashes
 }
 
