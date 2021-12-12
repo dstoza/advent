@@ -8,45 +8,72 @@ fn is_lowercase(s: &str) -> bool {
     s != "end" && s.chars().next().unwrap().is_lowercase()
 }
 
-fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<(String, bool)>> {
+const END: u8 = 12;
+const START: u8 = END - 1;
+
+fn get_symbol(symbols: &mut HashMap<String, u8>, next_lowercase: &mut u8, next_uppercase: &mut u8, s: &str) -> u8 {
+    *symbols.entry(String::from(s)).or_insert_with(|| if is_lowercase(s) {
+        *next_lowercase += 1;
+        assert!(*next_lowercase < START);
+        *next_lowercase - 1
+    } else {
+        *next_uppercase += 1;
+        *next_uppercase - 1
+    })
+}
+
+fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<u8, Vec<u8>> {
     let mut neighbors = HashMap::new();
+
+    let mut symbols = HashMap::from([
+        (String::from("start"), START),
+        (String::from("end"), END)
+    ]);
+
+    let mut next_lowercase = 0;
+    let mut next_uppercase = END + 1;
 
     for line in lines {
         let mut split = line.split('-');
         let from = split.next().unwrap();
+        let from = get_symbol(&mut symbols, &mut next_lowercase, &mut next_uppercase, from);
+
         let to = split.next().unwrap();
-        if to != "start" {
+        let to = get_symbol(&mut symbols, &mut  next_lowercase, &mut next_uppercase, to);
+
+        if to != START {
             neighbors
-                .entry(String::from(from))
+                .entry(from)
                 .or_insert_with(Vec::new)
-                .push((String::from(to), is_lowercase(to)));
+                .push(to);
         }
-        if from != "start" {
+        if from != START {
             neighbors
-                .entry(String::from(to))
+                .entry(to)
                 .or_insert_with(Vec::new)
-                .push((String::from(from), is_lowercase(from)));
+                .push(from);
         }
     }
 
     neighbors
 }
 
-fn do_count_paths<'a>(
-    neighbors: &'a HashMap<String, Vec<(String, bool)>>,
+fn do_count_paths(
+    neighbors: &HashMap<u8, Vec<u8>>,
     allow_duplicates: bool,
-    current_path: &mut Vec<&'a str>,
+    current_path: &mut Vec<u8>,
     has_duplicate: bool,
 ) -> usize {
     let current_cave = current_path.last().unwrap();
-    if *current_cave == "end" {
+    if *current_cave == END {
         return 1;
     }
 
     let mut paths = 0;
 
-    for (neighbor, neighbor_is_lowercase) in &neighbors[*current_cave] {
-        let has_duplicate = if *neighbor_is_lowercase
+    for neighbor in &neighbors[current_cave] {
+        let neighbor_is_lowercase = *neighbor < START;
+        let has_duplicate = if neighbor_is_lowercase
             && current_path.iter().rfind(|element| *element == neighbor) != None
         {
             if !allow_duplicates || has_duplicate {
@@ -57,7 +84,7 @@ fn do_count_paths<'a>(
             has_duplicate
         };
 
-        current_path.push(neighbor);
+        current_path.push(*neighbor);
         paths += do_count_paths(neighbors, allow_duplicates, current_path, has_duplicate);
         current_path.pop();
     }
@@ -65,8 +92,8 @@ fn do_count_paths<'a>(
     paths
 }
 
-fn count_paths(neighbors: &HashMap<String, Vec<(String, bool)>>, allow_duplicates: bool) -> usize {
-    do_count_paths(neighbors, allow_duplicates, &mut vec!["start"], false)
+fn count_paths(neighbors: &HashMap<u8, Vec<u8>>, allow_duplicates: bool) -> usize {
+    do_count_paths(neighbors, allow_duplicates, &mut vec![START], false)
 }
 
 fn main() {
