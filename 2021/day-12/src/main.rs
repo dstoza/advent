@@ -28,10 +28,10 @@ fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<
     neighbors
 }
 
-fn count_paths(
-    neighbors: &HashMap<String, Vec<String>>,
+fn count_paths<'a>(
+    neighbors: &'a HashMap<String, Vec<String>>,
     allow_duplicates: bool,
-    current_path: Vec<&str>,
+    current_path: &mut Vec<&'a str>,
     current_node: &str,
 ) -> usize {
     if current_node == "end" {
@@ -58,12 +58,9 @@ fn count_paths(
             continue;
         }
 
-        let path = {
-            let mut path = current_path.clone();
-            path.push(neighbor);
-            path
-        };
-        paths += count_paths(neighbors, allow_duplicates, path, neighbor);
+        current_path.push(neighbor);
+        paths += count_paths(neighbors, allow_duplicates, current_path, neighbor);
+        current_path.pop();
     }
 
     paths
@@ -75,7 +72,7 @@ fn main() {
     let neighbors = parse_neighbors(reader.lines().map(|l| l.unwrap()));
     println!(
         "Paths: {}",
-        count_paths(&neighbors, true, Vec::new(), "start")
+        count_paths(&neighbors, true, &mut Vec::new(), "start")
     )
 }
 
@@ -136,36 +133,42 @@ mod test {
     #[test]
     fn test_count_paths_simple() {
         let neighbors = parse_neighbors(get_simple().into_iter());
-        assert_eq!(count_paths(&neighbors, false, Vec::new(), "start"), 10);
+        assert_eq!(count_paths(&neighbors, false, &mut Vec::new(), "start"), 10);
     }
 
     #[test]
     fn test_count_paths_simple_with_duplicates() {
         let neighbors = parse_neighbors(get_simple().into_iter());
-        assert_eq!(count_paths(&neighbors, true, Vec::new(), "start"), 36);
+        assert_eq!(count_paths(&neighbors, true, &mut Vec::new(), "start"), 36);
     }
 
     #[test]
     fn test_count_paths_slightly_larger() {
         let neighbors = parse_neighbors(get_slightly_larger().into_iter());
-        assert_eq!(count_paths(&neighbors, false, Vec::new(), "start"), 19);
+        assert_eq!(count_paths(&neighbors, false, &mut Vec::new(), "start"), 19);
     }
 
     #[test]
     fn test_count_paths_slightly_larger_with_duplicates() {
         let neighbors = parse_neighbors(get_slightly_larger().into_iter());
-        assert_eq!(count_paths(&neighbors, true, Vec::new(), "start"), 103);
+        assert_eq!(count_paths(&neighbors, true, &mut Vec::new(), "start"), 103);
     }
 
     #[test]
     fn test_count_paths_even_larger() {
         let neighbors = parse_neighbors(get_even_larger().into_iter());
-        assert_eq!(count_paths(&neighbors, false, Vec::new(), "start"), 226);
+        assert_eq!(
+            count_paths(&neighbors, false, &mut Vec::new(), "start"),
+            226
+        );
     }
 
     #[test]
     fn test_count_paths_even_larger_with_duplicates() {
         let neighbors = parse_neighbors(get_even_larger().into_iter());
-        assert_eq!(count_paths(&neighbors, true, Vec::new(), "start"), 3509);
+        assert_eq!(
+            count_paths(&neighbors, true, &mut Vec::new(), "start"),
+            3509
+        );
     }
 }
