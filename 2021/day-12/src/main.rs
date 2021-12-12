@@ -87,7 +87,7 @@ fn do_count_paths(
     allow_duplicates: bool,
     previous_lowercase: &mut Vec<u8>,
     has_duplicate: bool,
-    current_cave: u8
+    current_cave: u8,
 ) -> usize {
     if current_cave == END {
         return 1;
@@ -98,7 +98,10 @@ fn do_count_paths(
     for neighbor in neighbors.at(current_cave) {
         let neighbor_is_lowercase = *neighbor < START;
         let has_duplicate = if neighbor_is_lowercase
-            && previous_lowercase.iter().find(|element| *element == neighbor) != None
+            && previous_lowercase
+                .iter()
+                .find(|element| *element == neighbor)
+                != None
         {
             if !allow_duplicates || has_duplicate {
                 continue;
@@ -111,7 +114,13 @@ fn do_count_paths(
         if neighbor_is_lowercase {
             previous_lowercase.push(*neighbor);
         }
-        paths += do_count_paths(neighbors, allow_duplicates, previous_lowercase, has_duplicate, *neighbor);
+        paths += do_count_paths(
+            neighbors,
+            allow_duplicates,
+            previous_lowercase,
+            has_duplicate,
+            *neighbor,
+        );
         if neighbor_is_lowercase {
             previous_lowercase.pop();
         }
