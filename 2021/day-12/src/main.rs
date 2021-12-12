@@ -4,7 +4,11 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<String>> {
+fn is_lowercase(s: &str) -> bool {
+    s != "end" && s.chars().next().unwrap().is_lowercase()
+}
+
+fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<(String, bool)>> {
     let mut neighbors = HashMap::new();
 
     for line in lines {
@@ -15,13 +19,13 @@ fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<
             neighbors
                 .entry(String::from(from))
                 .or_insert_with(Vec::new)
-                .push(String::from(to));
+                .push((String::from(to), is_lowercase(to)));
         }
         if from != "start" {
             neighbors
                 .entry(String::from(to))
                 .or_insert_with(Vec::new)
-                .push(String::from(from));
+                .push((String::from(from), is_lowercase(from)));
         }
     }
 
@@ -29,7 +33,7 @@ fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> HashMap<String, Vec<
 }
 
 fn do_count_paths<'a>(
-    neighbors: &'a HashMap<String, Vec<String>>,
+    neighbors: &'a HashMap<String, Vec<(String, bool)>>,
     allow_duplicates: bool,
     current_path: &mut Vec<&'a str>,
     has_duplicate: bool,
@@ -41,9 +45,8 @@ fn do_count_paths<'a>(
 
     let mut paths = 0;
 
-    for neighbor in &neighbors[*current_cave] {
-        let has_duplicate = if neighbor != "end"
-            && neighbor.chars().next().unwrap().is_lowercase()
+    for (neighbor, neighbor_is_lowercase) in &neighbors[*current_cave] {
+        let has_duplicate = if *neighbor_is_lowercase
             && current_path.iter().rfind(|element| *element == neighbor) != None
         {
             if !allow_duplicates || has_duplicate {
@@ -62,7 +65,7 @@ fn do_count_paths<'a>(
     paths
 }
 
-fn count_paths(neighbors: &HashMap<String, Vec<String>>, allow_duplicates: bool) -> usize {
+fn count_paths(neighbors: &HashMap<String, Vec<(String, bool)>>, allow_duplicates: bool) -> usize {
     do_count_paths(neighbors, allow_duplicates, &mut vec!["start"], false)
 }
 
