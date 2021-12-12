@@ -52,7 +52,7 @@ fn count_paths(
     for neighbor in &neighbors[current_node] {
         if neighbor != "end"
             && neighbor.chars().next().unwrap().is_lowercase()
-            && current_path.iter().find(|element| ***element == *neighbor) != None
+            && current_path.iter().find(|element| *element == neighbor) != None
             && (!allow_duplicates || path_lowercase_has_duplicates)
         {
             continue;
