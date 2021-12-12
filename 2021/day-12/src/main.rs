@@ -44,7 +44,7 @@ fn do_count_paths<'a>(
     for neighbor in &neighbors[*current_cave] {
         let has_duplicate = if neighbor != "end"
             && neighbor.chars().next().unwrap().is_lowercase()
-            && current_path.iter().find(|element| *element == neighbor) != None
+            && current_path.iter().rfind(|element| *element == neighbor) != None
         {
             if !allow_duplicates || has_duplicate {
                 continue;
