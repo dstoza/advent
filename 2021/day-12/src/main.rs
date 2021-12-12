@@ -33,15 +33,15 @@ fn do_count_paths<'a>(
     allow_duplicates: bool,
     current_path: &mut Vec<&'a str>,
     has_duplicate: bool,
-    current_node: &str,
 ) -> usize {
-    if current_node == "end" {
+    let current_cave = current_path.last().unwrap();
+    if *current_cave == "end" {
         return 1;
     }
 
     let mut paths = 0;
 
-    for neighbor in &neighbors[current_node] {
+    for neighbor in &neighbors[*current_cave] {
         let has_duplicate = if neighbor != "end"
             && neighbor.chars().next().unwrap().is_lowercase()
             && current_path.iter().find(|element| *element == neighbor) != None
@@ -55,13 +55,7 @@ fn do_count_paths<'a>(
         };
 
         current_path.push(neighbor);
-        paths += do_count_paths(
-            neighbors,
-            allow_duplicates,
-            current_path,
-            has_duplicate,
-            neighbor,
-        );
+        paths += do_count_paths(neighbors, allow_duplicates, current_path, has_duplicate);
         current_path.pop();
     }
 
@@ -69,7 +63,7 @@ fn do_count_paths<'a>(
 }
 
 fn count_paths(neighbors: &HashMap<String, Vec<String>>, allow_duplicates: bool) -> usize {
-    do_count_paths(neighbors, allow_duplicates, &mut Vec::new(), false, "start")
+    do_count_paths(neighbors, allow_duplicates, &mut vec!["start"], false)
 }
 
 fn main() {
