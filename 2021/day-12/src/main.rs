@@ -85,20 +85,20 @@ fn parse_neighbors<I: Iterator<Item = String>>(lines: I) -> TinyMap {
 fn do_count_paths(
     neighbors: &TinyMap,
     allow_duplicates: bool,
-    current_path: &mut Vec<u8>,
+    previous_lowercase: &mut Vec<u8>,
     has_duplicate: bool,
+    current_cave: u8
 ) -> usize {
-    let current_cave = current_path.last().unwrap();
-    if *current_cave == END {
+    if current_cave == END {
         return 1;
     }
 
     let mut paths = 0;
 
-    for neighbor in neighbors.at(*current_cave) {
+    for neighbor in neighbors.at(current_cave) {
         let neighbor_is_lowercase = *neighbor < START;
         let has_duplicate = if neighbor_is_lowercase
-            && current_path.iter().rfind(|element| *element == neighbor) != None
+            && previous_lowercase.iter().find(|element| *element == neighbor) != None
         {
             if !allow_duplicates || has_duplicate {
                 continue;
@@ -108,16 +108,20 @@ fn do_count_paths(
             has_duplicate
         };
 
-        current_path.push(*neighbor);
-        paths += do_count_paths(neighbors, allow_duplicates, current_path, has_duplicate);
-        current_path.pop();
+        if neighbor_is_lowercase {
+            previous_lowercase.push(*neighbor);
+        }
+        paths += do_count_paths(neighbors, allow_duplicates, previous_lowercase, has_duplicate, *neighbor);
+        if neighbor_is_lowercase {
+            previous_lowercase.pop();
+        }
     }
 
     paths
 }
 
 fn count_paths(neighbors: &TinyMap, allow_duplicates: bool) -> usize {
-    do_count_paths(neighbors, allow_duplicates, &mut vec![START], false)
+    do_count_paths(neighbors, allow_duplicates, &mut Vec::new(), false, START)
 }
 
 fn main() {
