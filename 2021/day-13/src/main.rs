@@ -58,21 +58,20 @@ fn execute_command(coordinates: &mut [(u16, u16)], command: &Command) {
     }
 }
 
-fn count_dots(coordinates: &mut [(u16, u16)], commands: &[Command]) -> usize {
+fn get_unique_dots(coordinates: &mut [(u16, u16)], commands: &[Command]) -> HashSet<(u16, u16)> {
     for command in commands {
         execute_command(coordinates, command)
     }
 
-    let unique_dots: HashSet<_> = coordinates.iter().cloned().collect();
-    unique_dots.len()
+    coordinates.iter().cloned().collect()
 }
 
-fn print_dots(coordinates: &[(u16, u16)]) {
-    let coordinates: HashSet<_> = coordinates.iter().cloned().collect();
+fn print_dots(coordinates: &mut [(u16, u16)], commands: &[Command]) {
+    let unique_dots = get_unique_dots(coordinates, commands);
 
     let mut max_x = 0;
     let mut max_y = 0;
-    for (x, y) in &coordinates {
+    for (x, y) in &unique_dots {
         max_x = max_x.max(*x);
         max_y = max_y.max(*y);
     }
@@ -97,10 +96,7 @@ fn main() {
     let reader = BufReader::new(file);
     let (mut coordinates, commands) = parse_input(reader.lines().map(|line| line.unwrap()));
     // println!("Dots: {}", count_dots(&mut coordinates, &commands[0..1]));
-    for command in commands {
-        execute_command(&mut coordinates, &command);
-    }
-    print_dots(&coordinates);
+    print_dots(&mut coordinates, &commands);
 }
 
 #[cfg(test)]
@@ -176,6 +172,6 @@ mod test {
     #[test]
     fn test_count_dots_simple() {
         let (mut coordinates, commands) = parse_input(get_simple().into_iter());
-        assert_eq!(count_dots(&mut coordinates, &commands[0..1]), 17)
+        assert_eq!(get_unique_dots(&mut coordinates, &commands[0..1]).len(), 17)
     }
 }
