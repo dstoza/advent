@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -137,8 +140,9 @@ fn main() {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
+    use test::Bencher;
 
     fn get_example() -> [String; 18] {
         [
@@ -183,5 +187,20 @@ mod test {
             get_difference(&rules, &mut template, last_character, 40),
             2188189693529
         );
+    }
+
+    #[bench]
+    fn bench_input(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let lines: Vec<_> = reader.lines().map(|line| line.unwrap()).collect();
+
+        b.iter(|| {
+            let (mut template, rules, last_character) = parse_input(lines.clone().into_iter());
+            assert_eq!(
+                get_difference(&rules, &mut template, last_character, 40),
+                2587447599164
+            );
+        })
     }
 }
