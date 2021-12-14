@@ -5,59 +5,91 @@ use std::{
     mem::swap,
 };
 
-type Pair = [u8; 2];
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Token(u8);
 
-fn parse_input<I: Iterator<Item = String>>(
-    mut lines: I,
-) -> (HashMap<Pair, usize>, HashMap<Pair, [Pair; 2]>, u8) {
+type Template = Vec<usize>; // Counts of occurrences of each token
+type Rules = Vec<(char, [Token; 2])>; // First character and two descendants
+type RulesSlice = [(char, [Token; 2])];
+
+fn parse_input<I: Iterator<Item = String>>(mut lines: I) -> (Template, Rules, char) {
+    let mut token_map = HashMap::new();
+    let mut next_token = 0u8;
+    let mut get_next_token = || {
+        let token = next_token;
+        next_token += 1;
+        Token(token)
+    };
+
     let template = lines.next().unwrap();
-    let last_character = template.bytes().last().unwrap();
+    let last_character = template.chars().last().unwrap();
 
     let pairs: Vec<_> = template
-        .bytes()
-        .collect::<Vec<u8>>()
+        .chars()
+        .collect::<Vec<char>>()
         .as_slice()
         .windows(2)
         .map(|window| [window[0], window[1]])
         .collect();
 
-    let mut template = HashMap::new();
+    let mut template = Vec::new();
     for pair in pairs {
-        template
-            .entry(pair)
-            .and_modify(|value| *value += 1)
-            .or_insert(1usize);
+        let token = *token_map.entry(pair).or_insert_with(&mut get_next_token);
+
+        if token.0 as usize >= template.len() {
+            template.resize(token.0 as usize + 1, 0);
+        }
+
+        template[token.0 as usize] += 1;
     }
 
     // Skip the blank line
     lines.next();
 
-    let rules = lines
-        .into_iter()
-        .map(|rule| {
-            let mut split = rule.split(" -> ");
-            let from: Pair = split.next().unwrap().as_bytes().try_into().unwrap();
-            let to = split.next().unwrap().bytes().next().unwrap();
+    let mut rules = Vec::new();
+    for rule_line in lines {
+        let mut split = rule_line.split(" -> ");
+        let from: [char; 2] = split
+            .next()
+            .unwrap()
+            .chars()
+            .take(2)
+            .collect::<Vec<char>>()
+            .as_slice()
+            .try_into()
+            .unwrap();
+        let to = split.next().unwrap().chars().next().unwrap();
 
-            let first = [from[0], to];
-            let second = [to, from[1]];
+        let first = *token_map
+            .entry([from[0], to])
+            .or_insert_with(&mut get_next_token);
+        let second = *token_map
+            .entry([to, from[1]])
+            .or_insert_with(&mut get_next_token);
 
-            (from, [first, second])
-        })
-        .collect();
+        let from_token = *token_map.entry(from).or_insert_with(&mut get_next_token);
+
+        if from_token.0 as usize >= rules.len() {
+            rules.resize(from_token.0 as usize + 1, ('x', [Token(255), Token(255)]));
+        }
+
+        rules[from_token.0 as usize] = (from[0], [first, second]);
+    }
 
     (template, rules, last_character)
 }
 
-fn run_step(rules: &HashMap<Pair, [Pair; 2]>, template: &mut HashMap<Pair, usize>) {
-    let mut output = HashMap::new();
+fn run_step(rules: &RulesSlice, template: &mut Template) {
+    let mut output = Vec::new();
 
-    for (pair, count) in &*template {
-        for rule in &rules[pair] {
-            output
-                .entry(*rule)
-                .and_modify(|value| *value += *count)
-                .or_insert(*count);
+    for (index, count) in template.iter().enumerate() {
+        let (_first_character, descendants) = &rules[index];
+        for descendant in descendants {
+            if descendant.0 as usize >= output.len() {
+                output.resize(descendant.0 as usize + 1, 0);
+            }
+
+            output[descendant.0 as usize] += count;
         }
     }
 
@@ -65,9 +97,9 @@ fn run_step(rules: &HashMap<Pair, [Pair; 2]>, template: &mut HashMap<Pair, usize
 }
 
 fn get_difference(
-    rules: &HashMap<Pair, [Pair; 2]>,
-    template: &mut HashMap<Pair, usize>,
-    last_character: u8,
+    rules: &RulesSlice,
+    template: &mut Template,
+    last_character: char,
     steps: usize,
 ) -> usize {
     for _ in 0..steps {
@@ -75,14 +107,18 @@ fn get_difference(
     }
 
     let mut letter_counts = HashMap::new();
-    let last = [(&[last_character, last_character], &mut 1)];
-    for (pair, count) in template.iter_mut().chain(last) {
-        let first_character = pair[0];
+    for (index, count) in template.iter().enumerate() {
+        let (first_character, _descendants) = &rules[index];
         letter_counts
             .entry(first_character)
             .and_modify(|value| *value += *count)
             .or_insert(*count);
     }
+
+    letter_counts
+        .entry(&last_character)
+        .and_modify(|value| *value += 1)
+        .or_insert(1);
 
     let min = letter_counts.values().cloned().min().unwrap();
     let max = letter_counts.values().cloned().max().unwrap();
@@ -132,48 +168,8 @@ mod test {
         let input = [String::from("ABC"), String::new(), String::from("AC -> B")];
 
         let (template, rules, _last_character) = parse_input(input.into_iter());
-        assert_eq!(
-            template,
-            HashMap::from([([b'A', b'B'], 1), ([b'B', b'C'], 1),])
-        );
-        assert_eq!(
-            rules,
-            HashMap::from([([b'A', b'C'], [[b'A', b'B'], [b'B', b'C']])])
-        )
-    }
-
-    #[test]
-    fn test_run_step() {
-        let (mut template, rules, _last_character) = parse_input(get_example().into_iter());
-        run_step(&rules, &mut template);
-        // NCNBCHB
-        assert_eq!(
-            template,
-            HashMap::from([
-                ([b'N', b'C'], 1),
-                ([b'C', b'N'], 1),
-                ([b'N', b'B'], 1),
-                ([b'B', b'C'], 1),
-                ([b'C', b'H'], 1),
-                ([b'H', b'B'], 1),
-            ])
-        );
-
-        run_step(&rules, &mut template);
-        // NBCCNBBBCBHCB
-        assert_eq!(
-            template,
-            HashMap::from([
-                ([b'N', b'B'], 2),
-                ([b'B', b'C'], 2),
-                ([b'C', b'C'], 1),
-                ([b'C', b'N'], 1),
-                ([b'B', b'B'], 2),
-                ([b'C', b'B'], 2),
-                ([b'B', b'H'], 1),
-                ([b'H', b'C'], 1),
-            ])
-        );
+        assert_eq!(template, vec![1, 1]);
+        assert_eq!(rules[2], ('A', [Token(0), Token(1)]))
     }
 
     #[test]
