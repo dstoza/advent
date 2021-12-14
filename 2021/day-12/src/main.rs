@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -141,8 +144,9 @@ fn main() {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
+    use test::Bencher;
 
     fn get_simple() -> [String; 7] {
         [
@@ -228,5 +232,17 @@ mod test {
     fn test_count_paths_even_larger_with_duplicates() {
         let neighbors = parse_neighbors(get_even_larger().into_iter());
         assert_eq!(count_paths(&neighbors, true), 3509);
+    }
+
+    #[bench]
+    fn bench_input(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let lines: Vec<_> = reader.lines().map(|line| line.unwrap()).collect();
+
+        b.iter(|| {
+            let neighbors = parse_neighbors(lines.clone().into_iter());
+            assert_eq!(count_paths(&neighbors, true), 84271);
+        });
     }
 }
