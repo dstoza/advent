@@ -12,71 +12,79 @@ fn parse_input<I: Iterator<Item = String>>(lines: I) -> Vec<Vec<u8>> {
         .collect()
 }
 
-fn propagate_updates(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<usize>], mut updates: VecDeque::<(usize, usize)>) {
+fn propagate_updates(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16>], mut updates: VecDeque::<(usize, usize)>) {
+    let mut update_count = 0;
+
     while let Some((row, column)) = updates.pop_front() {
-        if row > 0 && (lowest_risk[row][column] + risk_to_enter[row - 1][column] as usize) < lowest_risk[row - 1][column] {
-            lowest_risk[row - 1][column] = lowest_risk[row][column] + risk_to_enter[row - 1][column] as usize;
+        if row > 0 && (lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16) < lowest_risk[row - 1][column] {
+            lowest_risk[row - 1][column] = lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16;
+            update_count += 1;
             updates.push_back((row - 1, column));
         }
 
-        if column > 0 && (lowest_risk[row][column] + risk_to_enter[row][column - 1] as usize) < lowest_risk[row][column - 1] {
-            lowest_risk[row][column - 1] = lowest_risk[row][column] + risk_to_enter[row][column - 1] as usize;
+        if column > 0 && (lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16) < lowest_risk[row][column - 1] {
+            lowest_risk[row][column - 1] = lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16;
+            update_count += 1;
             updates.push_back((row, column - 1));
         }
 
-        if column + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row][column + 1] as usize) < lowest_risk[row][column + 1] {
-            lowest_risk[row][column + 1] = lowest_risk[row][column] + risk_to_enter[row][column + 1] as usize;
+        if column + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16) < lowest_risk[row][column + 1] {
+            lowest_risk[row][column + 1] = lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16;
+            update_count += 1;
             updates.push_back((row, column + 1));
         }
 
-        if row + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row + 1][column] as usize) < lowest_risk[row + 1][column] {
-            lowest_risk[row + 1][column] = lowest_risk[row][column] + risk_to_enter[row + 1][column] as usize;
+        if row + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16) < lowest_risk[row + 1][column] {
+            lowest_risk[row + 1][column] = lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16;
+            update_count += 1;
             updates.push_back((row + 1, column));
         }
     }
+
+    println!("{} Updates", update_count);
 }
 
-fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<usize>]) {
+fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16>]) {
     let mut updates = VecDeque::new();
     
     for row in 0..risk_to_enter.len() {
         for column in 0..risk_to_enter.len() {
             // Above
             if row > 0
-                && (lowest_risk[row - 1][column] + risk_to_enter[row][column] as usize)
+                && (lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row - 1][column] + risk_to_enter[row][column] as usize;
+                lowest_risk[row][column] = lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
 
             // Left
             if column > 0
-                && (lowest_risk[row][column - 1] + risk_to_enter[row][column] as usize)
+                && (lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row][column - 1] + risk_to_enter[row][column] as usize;
+                lowest_risk[row][column] = lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
 
             // Right
             if column + 1 < risk_to_enter.len()
-                && (lowest_risk[row][column + 1] + risk_to_enter[row][column] as usize)
+                && (lowest_risk[row][column + 1] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row][column + 1] + risk_to_enter[row][column] as usize;
+                lowest_risk[row][column] = lowest_risk[row][column + 1] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
 
             // Below
             if row + 1 < risk_to_enter.len()
-                && (lowest_risk[row + 1][column] + risk_to_enter[row][column] as usize)
+                && (lowest_risk[row + 1][column] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row + 1][column] + risk_to_enter[row][column] as usize;
+                lowest_risk[row][column] = lowest_risk[row + 1][column] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
@@ -86,7 +94,7 @@ fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<usi
     propagate_updates(risk_to_enter, lowest_risk, updates);
 }
 
-fn get_lowest_risk(risk_to_enter: &[Vec<u8>]) -> usize {
+fn get_lowest_risk(risk_to_enter: &[Vec<u8>]) -> u16 {
     let mut lowest_risk = vec![vec![0; risk_to_enter[0].len()]; risk_to_enter.len()];
 
     // Do a quick, approximate initial propagation
@@ -97,14 +105,14 @@ fn get_lowest_risk(risk_to_enter: &[Vec<u8>]) -> usize {
             }
 
             let left = if column > 0 {
-                lowest_risk[row][column - 1] + risk_to_enter[row][column] as usize
+                lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16
             } else {
-                usize::MAX
+                u16::MAX
             };
             let above = if row > 0 {
-                lowest_risk[row - 1][column] + risk_to_enter[row][column] as usize
+                lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16
             } else {
-                usize::MAX
+                u16::MAX
             };
 
             lowest_risk[row][column] = left.min(above);
@@ -151,6 +159,7 @@ fn main() {
     );
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use test::Bencher;
