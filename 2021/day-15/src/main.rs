@@ -2,8 +2,9 @@
 extern crate test;
 
 use std::{
+    collections::VecDeque,
     fs::File,
-    io::{BufRead, BufReader}, collections::VecDeque,
+    io::{BufRead, BufReader},
 };
 
 fn parse_input<I: Iterator<Item = String>>(lines: I) -> Vec<Vec<u8>> {
@@ -12,30 +13,50 @@ fn parse_input<I: Iterator<Item = String>>(lines: I) -> Vec<Vec<u8>> {
         .collect()
 }
 
-fn propagate_updates(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16>], mut updates: VecDeque::<(usize, usize)>) {
+fn propagate_updates(
+    risk_to_enter: &[Vec<u8>],
+    lowest_risk: &mut [Vec<u16>],
+    mut updates: VecDeque<(usize, usize)>,
+) {
     let mut update_count = 0;
 
     while let Some((row, column)) = updates.pop_front() {
-        if row > 0 && (lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16) < lowest_risk[row - 1][column] {
-            lowest_risk[row - 1][column] = lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16;
+        if row > 0
+            && (lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16)
+                < lowest_risk[row - 1][column]
+        {
+            lowest_risk[row - 1][column] =
+                lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16;
             update_count += 1;
             updates.push_back((row - 1, column));
         }
 
-        if column > 0 && (lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16) < lowest_risk[row][column - 1] {
-            lowest_risk[row][column - 1] = lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16;
+        if column > 0
+            && (lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16)
+                < lowest_risk[row][column - 1]
+        {
+            lowest_risk[row][column - 1] =
+                lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16;
             update_count += 1;
             updates.push_back((row, column - 1));
         }
 
-        if column + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16) < lowest_risk[row][column + 1] {
-            lowest_risk[row][column + 1] = lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16;
+        if column + 1 < risk_to_enter.len()
+            && (lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16)
+                < lowest_risk[row][column + 1]
+        {
+            lowest_risk[row][column + 1] =
+                lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16;
             update_count += 1;
             updates.push_back((row, column + 1));
         }
 
-        if row + 1 < risk_to_enter.len() && (lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16) < lowest_risk[row + 1][column] {
-            lowest_risk[row + 1][column] = lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16;
+        if row + 1 < risk_to_enter.len()
+            && (lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16)
+                < lowest_risk[row + 1][column]
+        {
+            lowest_risk[row + 1][column] =
+                lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16;
             update_count += 1;
             updates.push_back((row + 1, column));
         }
@@ -44,9 +65,9 @@ fn propagate_updates(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16>], mut
     println!("{} Updates", update_count);
 }
 
-fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16>]) {
+fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut [Vec<u16>]) {
     let mut updates = VecDeque::new();
-    
+
     for row in 0..risk_to_enter.len() {
         for column in 0..risk_to_enter.len() {
             // Above
@@ -54,7 +75,8 @@ fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16
                 && (lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16;
+                lowest_risk[row][column] =
+                    lowest_risk[row - 1][column] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
@@ -64,7 +86,8 @@ fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16
                 && (lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16;
+                lowest_risk[row][column] =
+                    lowest_risk[row][column - 1] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
@@ -74,7 +97,8 @@ fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16
                 && (lowest_risk[row][column + 1] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row][column + 1] + risk_to_enter[row][column] as u16;
+                lowest_risk[row][column] =
+                    lowest_risk[row][column + 1] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
@@ -84,7 +108,8 @@ fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut[Vec<u16
                 && (lowest_risk[row + 1][column] + risk_to_enter[row][column] as u16)
                     < lowest_risk[row][column]
             {
-                lowest_risk[row][column] = lowest_risk[row + 1][column] + risk_to_enter[row][column] as u16;
+                lowest_risk[row][column] =
+                    lowest_risk[row + 1][column] + risk_to_enter[row][column] as u16;
                 updates.push_back((row, column));
                 continue;
             }
