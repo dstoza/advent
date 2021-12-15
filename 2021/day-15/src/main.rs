@@ -18,8 +18,6 @@ fn propagate_updates(
     lowest_risk: &mut [Vec<u16>],
     mut updates: VecDeque<(usize, usize)>,
 ) {
-    let mut update_count = 0;
-
     while let Some((row, column)) = updates.pop_front() {
         if row > 0
             && (lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16)
@@ -27,7 +25,6 @@ fn propagate_updates(
         {
             lowest_risk[row - 1][column] =
                 lowest_risk[row][column] + risk_to_enter[row - 1][column] as u16;
-            update_count += 1;
             updates.push_back((row - 1, column));
         }
 
@@ -37,7 +34,6 @@ fn propagate_updates(
         {
             lowest_risk[row][column - 1] =
                 lowest_risk[row][column] + risk_to_enter[row][column - 1] as u16;
-            update_count += 1;
             updates.push_back((row, column - 1));
         }
 
@@ -47,7 +43,6 @@ fn propagate_updates(
         {
             lowest_risk[row][column + 1] =
                 lowest_risk[row][column] + risk_to_enter[row][column + 1] as u16;
-            update_count += 1;
             updates.push_back((row, column + 1));
         }
 
@@ -57,12 +52,9 @@ fn propagate_updates(
         {
             lowest_risk[row + 1][column] =
                 lowest_risk[row][column] + risk_to_enter[row + 1][column] as u16;
-            update_count += 1;
             updates.push_back((row + 1, column));
         }
     }
-
-    println!("{} Updates", update_count);
 }
 
 fn propagate_from_neighbors(risk_to_enter: &[Vec<u8>], lowest_risk: &mut [Vec<u16>]) {
