@@ -217,21 +217,6 @@ mod tests {
     use super::*;
     use test::Bencher;
 
-    fn get_example() -> [String; 10] {
-        [
-            String::from("1163751742"),
-            String::from("1381373672"),
-            String::from("2136511328"),
-            String::from("3694931569"),
-            String::from("7463417111"),
-            String::from("1319128137"),
-            String::from("1359912421"),
-            String::from("3125421639"),
-            String::from("1293138521"),
-            String::from("2311944581"),
-        ]
-    }
-
     #[test]
     fn test_convert_to_binary() {
         let message = String::from("123456789ABCDE");
@@ -390,15 +375,19 @@ mod tests {
         );
     }
 
-    // #[bench]
-    // fn bench_input(b: &mut Bencher) {
-    //     let file = File::open("input.txt").unwrap();
-    //     let reader = BufReader::new(file);
-    //     let lines: Vec<_> = reader.lines().map(|line| line.unwrap()).collect();
+    #[bench]
+    fn bench_input(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let input = reader.lines().next().unwrap().unwrap();
 
-    //     b.iter(|| {
-    //         let risk_to_enter = parse_input(lines.clone().into_iter());
-    //         assert_eq!(get_lowest_risk(&expand_map(&risk_to_enter)), 2814);
-    //     })
-    // }
+        b.iter(|| {
+            assert_eq!(
+                Packet::parse_from_binary(&convert_to_binary(input.clone()))
+                    .0
+                    .get_value(),
+                1675198555015
+            )
+        })
+    }
 }
