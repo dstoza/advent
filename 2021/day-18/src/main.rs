@@ -16,22 +16,28 @@ enum Contents {
 
 struct Node {
     parent: Option<Weak<RefCell<Node>>>,
+    weak_self: Weak<RefCell<Node>>,
     contents: Contents,
 }
 
 impl Node {
     fn new_regular(value: i32) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Node {
+        let node = Rc::new(RefCell::new(Node {
             parent: None,
+            weak_self: Weak::new(),
             contents: Contents::Regular(value),
-        }))
+        }));
+        node.borrow_mut().weak_self = Rc::downgrade(&node);
+        node
     }
 
     fn new_pair(left: Rc<RefCell<Node>>, right: Rc<RefCell<Node>>) -> Rc<RefCell<Self>> {
         let pair = Rc::new(RefCell::new(Node {
             parent: None,
+            weak_self: Weak::new(),
             contents: Contents::Pair(left, right),
         }));
+        pair.borrow_mut().weak_self = Rc::downgrade(&pair);
         if let Contents::Pair(left, right) = &mut pair.borrow_mut().contents {
             left.borrow_mut().parent = Some(Rc::downgrade(&pair));
             right.borrow_mut().parent = Some(Rc::downgrade(&pair));
@@ -53,35 +59,45 @@ impl Node {
         }
     }
 
-    fn visit_regular_nodes(&self, visitor: &dyn Fn(&Node)) {
+    fn visit_regular_nodes(&self, visitor: &dyn Fn(&Node) -> bool) -> bool {
         match &self.contents {
-            Contents::Regular(_) => visitor(self),
+            Contents::Regular(_) => return visitor(self),
             Contents::Pair(left, right) => {
-                left.borrow().visit_regular_nodes(&visitor);
-                right.borrow().visit_regular_nodes(&visitor);
+                if left.borrow().visit_regular_nodes(&visitor) {
+                    return true;
+                }
+                if right.borrow().visit_regular_nodes(&visitor) {
+                    return true;
+                }
             }
         }
+        false
     }
 
-    fn visit_pair_nodes(&self, visitor: &dyn Fn(&Node)) {
+    fn visit_pair_nodes(&self, visitor: &dyn Fn(&Node, usize) -> bool, depth: usize) -> bool {
         match &self.contents {
-            Contents::Regular(_) => return,
+            Contents::Regular(_) => return false,
             Contents::Pair(left, right) => {
                 let mut visited_child = false;
                 if let Contents::Pair(_, _) = left.borrow().contents {
-                    left.borrow().visit_pair_nodes(visitor);
+                    if left.borrow().visit_pair_nodes(visitor, depth + 1) {
+                        return true;
+                    }
                     visited_child = true;
                 }
                 if let Contents::Pair(_, _) = right.borrow().contents {
-                    right.borrow().visit_pair_nodes(visitor);
+                    if right.borrow().visit_pair_nodes(visitor, depth + 1) {
+                        return true;
+                    }
                     visited_child = true;
                 }
 
                 if !visited_child {
-                    visitor(self);
+                    return visitor(self, depth);
                 }
             }
-        }
+        };
+        false
     }
 }
 
@@ -104,12 +120,28 @@ fn main() {
         Node::parse_from_bytes(String::from("[[[[1,2],[3,4]],[[5,6],[7,8]]],9]").as_bytes());
     println!("{}", longer.borrow());
 
-    longer
-        .borrow()
-        .visit_regular_nodes(&|node| println!("{}", node));
-    longer
-        .borrow()
-        .visit_pair_nodes(&|node| println!("{}", node));
+    longer.borrow().visit_regular_nodes(&|node| {
+        println!("{}", node);
+        false
+    });
+    longer.borrow().visit_regular_nodes(&|node| {
+        println!("{}", node);
+        true
+    });
+    longer.borrow().visit_pair_nodes(
+        &|node, depth| {
+            println!("{} {}", node, depth);
+            false
+        },
+        0,
+    );
+    longer.borrow().visit_pair_nodes(
+        &|node, depth| {
+            println!("{} {}", node, depth);
+            true
+        },
+        0,
+    );
 }
 
 #[cfg(test)]
