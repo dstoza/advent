@@ -14,8 +14,14 @@ enum Contents {
     Pair(Rc<RefCell<Node>>, Rc<RefCell<Node>>),
 }
 
+#[derive(Eq, PartialEq)]
+enum Position {
+    Left,
+    Right,
+}
+
 struct Node {
-    parent: Option<Weak<RefCell<Node>>>,
+    parent: Option<(Weak<RefCell<Node>>, Position)>,
     weak_self: Weak<RefCell<Node>>,
     contents: Contents,
 }
@@ -39,8 +45,8 @@ impl Node {
         }));
         pair.borrow_mut().weak_self = Rc::downgrade(&pair);
         if let Contents::Pair(left, right) = &mut pair.borrow_mut().contents {
-            left.borrow_mut().parent = Some(Rc::downgrade(&pair));
-            right.borrow_mut().parent = Some(Rc::downgrade(&pair));
+            left.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Left));
+            right.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Right));
         }
         pair
     }
@@ -99,6 +105,34 @@ impl Node {
         };
         false
     }
+
+    fn get_rightmost_regular_node(&self) -> Rc<RefCell<Node>> {
+        match &self.contents {
+            Contents::Regular(_) => Weak::upgrade(&self.weak_self).unwrap(),
+            Contents::Pair(_left, right) => right.borrow().get_rightmost_regular_node(),
+        }
+    }
+
+    fn get_next_regular_node_left(&self) -> Option<Rc<RefCell<Node>>> {
+        if let Some((parent, position)) = &self.parent {
+            if *position == Position::Left {
+                Weak::upgrade(&parent)
+                    .unwrap()
+                    .borrow()
+                    .get_next_regular_node_left()
+            } else {
+                if let Contents::Pair(left, _right) =
+                    &Weak::upgrade(&parent).unwrap().borrow().contents
+                {
+                    Some(left.borrow().get_rightmost_regular_node())
+                } else {
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl Display for Node {
@@ -121,23 +155,57 @@ fn main() {
     println!("{}", longer.borrow());
 
     longer.borrow().visit_regular_nodes(&|node| {
-        println!("{}", node);
+        println!(
+            "{} <- {}",
+            if let Some(node) = node.get_next_regular_node_left() {
+                format!("{}", node.borrow())
+            } else {
+                String::from("None")
+            },
+            node
+        );
         false
     });
     longer.borrow().visit_regular_nodes(&|node| {
-        println!("{}", node);
+        println!(
+            "{} <- {}",
+            if let Some(node) = node.get_next_regular_node_left() {
+                format!("{}", node.borrow())
+            } else {
+                String::from("None")
+            },
+            node
+        );
         true
     });
     longer.borrow().visit_pair_nodes(
         &|node, depth| {
-            println!("{} {}", node, depth);
+            println!(
+                "{} <- {} {}",
+                if let Some(node) = node.get_next_regular_node_left() {
+                    format!("{}", node.borrow())
+                } else {
+                    String::from("None")
+                },
+                node,
+                depth
+            );
             false
         },
         0,
     );
     longer.borrow().visit_pair_nodes(
         &|node, depth| {
-            println!("{} {}", node, depth);
+            println!(
+                "{} <- {} {}",
+                if let Some(node) = node.get_next_regular_node_left() {
+                    format!("{}", node.borrow())
+                } else {
+                    String::from("None")
+                },
+                node,
+                depth
+            );
             true
         },
         0,
