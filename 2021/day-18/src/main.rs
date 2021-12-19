@@ -14,7 +14,7 @@ enum Contents {
     Pair(Rc<RefCell<Node>>, Rc<RefCell<Node>>),
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 enum Position {
     Left,
     Right,
@@ -47,6 +47,8 @@ impl Node {
         if let Contents::Pair(left, right) = &mut pair.borrow_mut().contents {
             left.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Left));
             right.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Right));
+        } else {
+            unreachable!()
         }
         pair
     }
@@ -172,7 +174,7 @@ fn explode(root: &Rc<RefCell<Node>>) -> bool {
     let mut node_to_explode = None;
     root.borrow().visit_pair_nodes(
         &mut |node, depth| {
-            if depth != 4 {
+            if depth < 4 {
                 return true;
             }
 
@@ -223,52 +225,67 @@ fn explode(root: &Rc<RefCell<Node>>) -> bool {
     }
 }
 
+// Returns whether a node split
+fn split(root: &Rc<RefCell<Node>>) -> bool {
+    let mut node_to_split = None;
+    root.borrow().visit_regular_nodes(&mut |node| {
+        if let Contents::Regular(value) = &node.contents {
+            if *value >= 10 {
+                node_to_split = Some(Weak::upgrade(&node.weak_self).unwrap());
+                return false;
+            }
+        }
+
+        true
+    });
+
+    if let Some(node) = node_to_split {
+        let value = if let Contents::Regular(value) = &node.borrow().contents {
+            *value
+        } else {
+            unreachable!()
+        };
+        let left = Node::new_regular(value / 2);
+        left.borrow_mut().parent = Some((node.borrow().weak_self.clone(), Position::Left));
+        let right = Node::new_regular(value - value / 2);
+        right.borrow_mut().parent = Some((node.borrow().weak_self.clone(), Position::Right));
+        node.borrow_mut().contents = Contents::Pair(left, right);
+
+        true
+    } else {
+        false
+    }
+}
+
+fn reduce(root: &Rc<RefCell<Node>>) {
+    loop {
+        if explode(root) {
+            continue;
+        }
+        if split(root) {
+            continue;
+        }
+        break;
+    }
+}
+
+fn reduce_list<I: Iterator<Item = String>>(mut list: I) -> Rc<RefCell<Node>> {
+    let mut left = Node::parse_from_bytes(list.next().unwrap().as_bytes()).0;
+    for item in list {
+        let root = Node::new_pair(left, Node::parse_from_bytes(item.as_bytes()).0);
+        reduce(&root);
+        left = root;
+    }
+    left
+}
+
 fn main() {
     // let file = File::open("input.txt").unwrap();
     // let reader = BufReader::new(file);
 
-    let (longer, _size) =
-        Node::parse_from_bytes(String::from("[[[[1,2],[3,4]],[[5,6],[7,8]]],9]").as_bytes());
-    println!("{}", longer.borrow());
-
-    longer.borrow().visit_regular_nodes(&mut |node| {
-        println!(
-            "{} <- {} -> {}",
-            if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
-                format!("{}", node.borrow())
-            } else {
-                String::from("None")
-            },
-            node,
-            if let Some(node) = node.get_next_regular_node_past_position(Position::Right) {
-                format!("{}", node.borrow())
-            } else {
-                String::from("None")
-            }
-        );
-        true
-    });
-    longer.borrow().visit_pair_nodes(
-        &mut |node, depth| {
-            println!(
-                "{} <- {} {} -> {}",
-                if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
-                    format!("{}", node.borrow())
-                } else {
-                    String::from("None")
-                },
-                node,
-                depth,
-                if let Some(node) = node.get_next_regular_node_past_position(Position::Right) {
-                    format!("{}", node.borrow())
-                } else {
-                    String::from("None")
-                }
-            );
-            true
-        },
-        0,
-    );
+    let root =
+        Node::parse_from_bytes(String::from("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]").as_bytes()).0;
+    reduce(&root);
 }
 
 #[cfg(test)]
@@ -276,46 +293,124 @@ mod tests {
     use super::*;
     use test::Bencher;
 
+    fn explode_helper(before: String, after: &str) {
+        let root = Node::parse_from_bytes(before.as_bytes()).0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(format!("{}", root.borrow()), after);
+    }
+
     #[test]
     fn test_explode() {
-        let root = Node::parse_from_bytes(String::from("[[[[[9,8],1],2],3],4]").as_bytes()).0;
-        assert_eq!(explode(&root), true);
-        assert_eq!(
-            format!("{}", root.borrow()),
-            String::from("[[[[0,9],2],3],4]")
+        explode_helper(String::from("[[[[[9,8],1],2],3],4]"), "[[[[0,9],2],3],4]");
+        explode_helper(String::from("[7,[6,[5,[4,[3,2]]]]]"), "[7,[6,[5,[7,0]]]]");
+        explode_helper(String::from("[[6,[5,[4,[3,2]]]],1]"), "[[6,[5,[7,0]]],3]");
+        explode_helper(
+            String::from("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]"),
+            "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
         );
-        assert_eq!(explode(&root), false);
-
-        let root = Node::parse_from_bytes(String::from("[7,[6,[5,[4,[3,2]]]]]").as_bytes()).0;
-        assert_eq!(explode(&root), true);
-        assert_eq!(
-            format!("{}", root.borrow()),
-            String::from("[7,[6,[5,[7,0]]]]")
+        explode_helper(
+            String::from("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]"),
+            "[[3,[2,[8,0]]],[9,[5,[7,0]]]]",
         );
+    }
 
-        let root = Node::parse_from_bytes(String::from("[[6,[5,[4,[3,2]]]],1]").as_bytes()).0;
-        assert_eq!(explode(&root), true);
-        assert_eq!(
-            format!("{}", root.borrow()),
-            String::from("[[6,[5,[7,0]]],3]")
-        );
+    #[test]
+    fn test_split() {
+        let root = Node::new_pair(Node::new_regular(11), Node::new_regular(11));
+        assert_eq!(split(&root), true);
+        assert_eq!(format!("{}", root.borrow()), "[[5,6],11]");
+        assert_eq!(split(&root), true);
+        assert_eq!(format!("{}", root.borrow()), "[[5,6],[5,6]]");
+        assert_eq!(split(&root), false);
+    }
 
+    #[test]
+    fn test_reduce() {
         let root = Node::parse_from_bytes(
-            String::from("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]").as_bytes(),
+            String::from("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]").as_bytes(),
         )
         .0;
-        assert_eq!(explode(&root), true);
+        reduce(&root);
         assert_eq!(
             format!("{}", root.borrow()),
-            String::from("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")
+            "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"
         );
+    }
 
-        let root =
-            Node::parse_from_bytes(String::from("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]").as_bytes()).0;
-        assert_eq!(explode(&root), true);
+    #[test]
+    fn test_reduce_list_4() {
+        let list = [
+            String::from("[1,1]"),
+            String::from("[2,2]"),
+            String::from("[3,3]"),
+            String::from("[4,4]"),
+        ];
         assert_eq!(
-            format!("{}", root.borrow()),
-            String::from("[[3,[2,[8,0]]],[9,[5,[7,0]]]]")
+            format!("{}", reduce_list(list.into_iter()).borrow()),
+            "[[[[1,1],[2,2]],[3,3]],[4,4]]"
+        );
+    }
+
+    #[test]
+    fn test_reduce_list_5() {
+        let list = [
+            String::from("[1,1]"),
+            String::from("[2,2]"),
+            String::from("[3,3]"),
+            String::from("[4,4]"),
+            String::from("[5,5]"),
+        ];
+        assert_eq!(
+            format!("{}", reduce_list(list.into_iter()).borrow()),
+            "[[[[3,0],[5,3]],[4,4]],[5,5]]"
+        );
+    }
+
+    #[test]
+    fn test_reduce_list_6() {
+        let list = [
+            String::from("[1,1]"),
+            String::from("[2,2]"),
+            String::from("[3,3]"),
+            String::from("[4,4]"),
+            String::from("[5,5]"),
+            String::from("[6,6]"),
+        ];
+        assert_eq!(
+            format!("{}", reduce_list(list.into_iter()).borrow()),
+            "[[[[5,0],[7,4]],[5,5]],[6,6]]"
+        );
+    }
+
+    #[test]
+    fn test_larger_example_step() {
+        let list = [
+            String::from("[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]"),
+            String::from("[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]"),
+        ];
+        assert_eq!(
+            format!("{}", reduce_list(list.into_iter()).borrow()),
+            "[[[[6,7],[6,7]],[[7,7],[0,7]]],[[[8,7],[7,7]],[[8,8],[8,0]]]]"
+        );
+    }
+
+    #[test]
+    fn test_larger_example() {
+        let list = [
+            String::from("[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]"),
+            String::from("[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]"),
+            String::from("[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]"),
+            String::from("[[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]"),
+            String::from("[7,[5,[[3,8],[1,4]]]]"),
+            String::from("[[2,[2,2]],[8,[8,1]]]"),
+            String::from("[2,9]"),
+            String::from("[1,[[[9,3],9],[[9,0],[0,7]]]]"),
+            String::from("[[[5,[7,4]],7],1]"),
+            String::from("[[[[4,2],2],6],[8,7]]"),
+        ];
+        assert_eq!(
+            format!("{}", reduce_list(list.into_iter()).borrow()),
+            "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"
         );
     }
 
