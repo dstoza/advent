@@ -65,35 +65,37 @@ impl Node {
         }
     }
 
+    // Visitor returns whether to continue visiting
     fn visit_regular_nodes(&self, visitor: &dyn Fn(&Node) -> bool) -> bool {
         match &self.contents {
             Contents::Regular(_) => return visitor(self),
             Contents::Pair(left, right) => {
-                if left.borrow().visit_regular_nodes(&visitor) {
-                    return true;
+                if !left.borrow().visit_regular_nodes(&visitor) {
+                    return false;
                 }
-                if right.borrow().visit_regular_nodes(&visitor) {
-                    return true;
+                if !right.borrow().visit_regular_nodes(&visitor) {
+                    return false;
                 }
             }
         }
-        false
+        true
     }
 
+    // Visitor returns whether to continue visiting
     fn visit_pair_nodes(&self, visitor: &dyn Fn(&Node, usize) -> bool, depth: usize) -> bool {
         match &self.contents {
-            Contents::Regular(_) => return false,
+            Contents::Regular(_) => return true,
             Contents::Pair(left, right) => {
                 let mut visited_child = false;
                 if let Contents::Pair(_, _) = left.borrow().contents {
-                    if left.borrow().visit_pair_nodes(visitor, depth + 1) {
-                        return true;
+                    if !left.borrow().visit_pair_nodes(visitor, depth + 1) {
+                        return false;
                     }
                     visited_child = true;
                 }
                 if let Contents::Pair(_, _) = right.borrow().contents {
-                    if right.borrow().visit_pair_nodes(visitor, depth + 1) {
-                        return true;
+                    if !right.borrow().visit_pair_nodes(visitor, depth + 1) {
+                        return false;
                     }
                     visited_child = true;
                 }
@@ -103,56 +105,43 @@ impl Node {
                 }
             }
         };
-        false
+        true
     }
 
-    fn get_leftmost_regular_node(&self) -> Rc<RefCell<Node>> {
+    fn get_farthest_node_by_position(&self, position: Position) -> Rc<RefCell<Node>> {
         match &self.contents {
             Contents::Regular(_) => Weak::upgrade(&self.weak_self).unwrap(),
-            Contents::Pair(left, _right) => left.borrow().get_leftmost_regular_node(),
+            Contents::Pair(left, right) => match position {
+                Position::Left => left.borrow().get_farthest_node_by_position(Position::Left),
+                Position::Right => right
+                    .borrow()
+                    .get_farthest_node_by_position(Position::Right),
+            },
         }
     }
 
-    fn get_rightmost_regular_node(&self) -> Rc<RefCell<Node>> {
-        match &self.contents {
-            Contents::Regular(_) => Weak::upgrade(&self.weak_self).unwrap(),
-            Contents::Pair(_left, right) => right.borrow().get_rightmost_regular_node(),
-        }
-    }
-
-    fn get_next_regular_node_left(&self) -> Option<Rc<RefCell<Node>>> {
+    fn get_next_regular_node_past_position(
+        &self,
+        past_position: Position,
+    ) -> Option<Rc<RefCell<Node>>> {
         if let Some((parent, position)) = &self.parent {
-            if *position == Position::Left {
+            if *position == past_position {
                 Weak::upgrade(&parent)
                     .unwrap()
                     .borrow()
-                    .get_next_regular_node_left()
+                    .get_next_regular_node_past_position(past_position)
             } else {
-                if let Contents::Pair(left, _right) =
+                if let Contents::Pair(left, right) =
                     &Weak::upgrade(&parent).unwrap().borrow().contents
                 {
-                    Some(left.borrow().get_rightmost_regular_node())
-                } else {
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    }
-
-    fn get_next_regular_node_right(&self) -> Option<Rc<RefCell<Node>>> {
-        if let Some((parent, position)) = &self.parent {
-            if *position == Position::Right {
-                Weak::upgrade(&parent)
-                    .unwrap()
-                    .borrow()
-                    .get_next_regular_node_right()
-            } else {
-                if let Contents::Pair(_left, right) =
-                    &Weak::upgrade(&parent).unwrap().borrow().contents
-                {
-                    Some(right.borrow().get_leftmost_regular_node())
+                    match past_position {
+                        Position::Left => {
+                            Some(left.borrow().get_farthest_node_by_position(Position::Right))
+                        }
+                        Position::Right => {
+                            Some(right.borrow().get_farthest_node_by_position(Position::Left))
+                        }
+                    }
                 } else {
                     None
                 }
@@ -185,38 +174,38 @@ fn main() {
     longer.borrow().visit_regular_nodes(&|node| {
         println!(
             "{} <- {} -> {}",
-            if let Some(node) = node.get_next_regular_node_left() {
+            if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
                 format!("{}", node.borrow())
             } else {
                 String::from("None")
             },
             node,
-            if let Some(node) = node.get_next_regular_node_right() {
+            if let Some(node) = node.get_next_regular_node_past_position(Position::Right) {
                 format!("{}", node.borrow())
             } else {
                 String::from("None")
             }
         );
-        false
+        true
     });
     longer.borrow().visit_pair_nodes(
         &|node, depth| {
             println!(
                 "{} <- {} {} -> {}",
-                if let Some(node) = node.get_next_regular_node_left() {
+                if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
                     format!("{}", node.borrow())
                 } else {
                     String::from("None")
                 },
                 node,
                 depth,
-                if let Some(node) = node.get_next_regular_node_right() {
+                if let Some(node) = node.get_next_regular_node_past_position(Position::Right) {
                     format!("{}", node.borrow())
                 } else {
                     String::from("None")
                 }
             );
-            false
+            true
         },
         0,
     );
