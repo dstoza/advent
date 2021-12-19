@@ -66,14 +66,14 @@ impl Node {
     }
 
     // Visitor returns whether to continue visiting
-    fn visit_regular_nodes(&self, visitor: &dyn Fn(&Node) -> bool) -> bool {
+    fn visit_regular_nodes(&self, visitor: &mut dyn FnMut(&Node) -> bool) -> bool {
         match &self.contents {
             Contents::Regular(_) => return visitor(self),
             Contents::Pair(left, right) => {
-                if !left.borrow().visit_regular_nodes(&visitor) {
+                if !left.borrow().visit_regular_nodes(visitor) {
                     return false;
                 }
-                if !right.borrow().visit_regular_nodes(&visitor) {
+                if !right.borrow().visit_regular_nodes(visitor) {
                     return false;
                 }
             }
@@ -82,7 +82,11 @@ impl Node {
     }
 
     // Visitor returns whether to continue visiting
-    fn visit_pair_nodes(&self, visitor: &dyn Fn(&Node, usize) -> bool, depth: usize) -> bool {
+    fn visit_pair_nodes(
+        &self,
+        visitor: &mut dyn FnMut(&Node, usize) -> bool,
+        depth: usize,
+    ) -> bool {
         match &self.contents {
             Contents::Regular(_) => return true,
             Contents::Pair(left, right) => {
@@ -163,6 +167,62 @@ impl Display for Node {
     }
 }
 
+// Returns whether a pair exploded
+fn explode(root: &Rc<RefCell<Node>>) -> bool {
+    let mut node_to_explode = None;
+    root.borrow().visit_pair_nodes(
+        &mut |node, depth| {
+            if depth != 4 {
+                return true;
+            }
+
+            node_to_explode = Some(Weak::upgrade(&node.weak_self).unwrap());
+            return false;
+        },
+        0,
+    );
+
+    if let Some(node) = node_to_explode {
+        let (left_value, right_value) = if let Contents::Pair(left, right) = &node.borrow().contents
+        {
+            let left_value = if let Contents::Regular(value) = &left.borrow().contents {
+                *value
+            } else {
+                unreachable!()
+            };
+            let right_value = if let Contents::Regular(value) = &right.borrow().contents {
+                *value
+            } else {
+                unreachable!()
+            };
+            (left_value, right_value)
+        } else {
+            unreachable!()
+        };
+
+        if let Some(next_node_left) = node
+            .borrow()
+            .get_next_regular_node_past_position(Position::Left)
+        {
+            if let Contents::Regular(value) = &mut next_node_left.borrow_mut().contents {
+                *value += left_value;
+            }
+        }
+        if let Some(next_node_right) = node
+            .borrow()
+            .get_next_regular_node_past_position(Position::Right)
+        {
+            if let Contents::Regular(value) = &mut next_node_right.borrow_mut().contents {
+                *value += right_value;
+            }
+        }
+        node.borrow_mut().contents = Contents::Regular(0);
+        true
+    } else {
+        false
+    }
+}
+
 fn main() {
     // let file = File::open("input.txt").unwrap();
     // let reader = BufReader::new(file);
@@ -171,7 +231,7 @@ fn main() {
         Node::parse_from_bytes(String::from("[[[[1,2],[3,4]],[[5,6],[7,8]]],9]").as_bytes());
     println!("{}", longer.borrow());
 
-    longer.borrow().visit_regular_nodes(&|node| {
+    longer.borrow().visit_regular_nodes(&mut |node| {
         println!(
             "{} <- {} -> {}",
             if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
@@ -189,7 +249,7 @@ fn main() {
         true
     });
     longer.borrow().visit_pair_nodes(
-        &|node, depth| {
+        &mut |node, depth| {
             println!(
                 "{} <- {} {} -> {}",
                 if let Some(node) = node.get_next_regular_node_past_position(Position::Left) {
@@ -216,10 +276,48 @@ mod tests {
     use super::*;
     use test::Bencher;
 
-    // #[test]
-    // fn test_sample() {
-    //     assert_eq!(get_possible_values(20..=30, -10..=-5).len(), 112);
-    // }
+    #[test]
+    fn test_explode() {
+        let root = Node::parse_from_bytes(String::from("[[[[[9,8],1],2],3],4]").as_bytes()).0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(
+            format!("{}", root.borrow()),
+            String::from("[[[[0,9],2],3],4]")
+        );
+        assert_eq!(explode(&root), false);
+
+        let root = Node::parse_from_bytes(String::from("[7,[6,[5,[4,[3,2]]]]]").as_bytes()).0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(
+            format!("{}", root.borrow()),
+            String::from("[7,[6,[5,[7,0]]]]")
+        );
+
+        let root = Node::parse_from_bytes(String::from("[[6,[5,[4,[3,2]]]],1]").as_bytes()).0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(
+            format!("{}", root.borrow()),
+            String::from("[[6,[5,[7,0]]],3]")
+        );
+
+        let root = Node::parse_from_bytes(
+            String::from("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]").as_bytes(),
+        )
+        .0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(
+            format!("{}", root.borrow()),
+            String::from("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")
+        );
+
+        let root =
+            Node::parse_from_bytes(String::from("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]").as_bytes()).0;
+        assert_eq!(explode(&root), true);
+        assert_eq!(
+            format!("{}", root.borrow()),
+            String::from("[[3,[2,[8,0]]],[9,[5,[7,0]]]]")
+        );
+    }
 
     // #[bench]
     // fn bench_input(b: &mut Bencher) {
