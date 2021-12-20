@@ -47,8 +47,6 @@ impl Node {
         if let Contents::Pair(left, right) = &mut pair.borrow_mut().contents {
             left.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Left));
             right.borrow_mut().parent = Some((Rc::downgrade(&pair), Position::Right));
-        } else {
-            unreachable!()
         }
         pair
     }
@@ -132,28 +130,35 @@ impl Node {
     ) -> Option<Rc<RefCell<Node>>> {
         if let Some((parent, position)) = &self.parent {
             if *position == past_position {
-                Weak::upgrade(&parent)
+                Weak::upgrade(parent)
                     .unwrap()
                     .borrow()
                     .get_next_regular_node_past_position(past_position)
-            } else {
-                if let Contents::Pair(left, right) =
-                    &Weak::upgrade(&parent).unwrap().borrow().contents
-                {
-                    match past_position {
-                        Position::Left => {
-                            Some(left.borrow().get_farthest_node_by_position(Position::Right))
-                        }
-                        Position::Right => {
-                            Some(right.borrow().get_farthest_node_by_position(Position::Left))
-                        }
+            } else if let Contents::Pair(left, right) =
+                &Weak::upgrade(parent).unwrap().borrow().contents
+            {
+                match past_position {
+                    Position::Left => {
+                        Some(left.borrow().get_farthest_node_by_position(Position::Right))
                     }
-                } else {
-                    None
+                    Position::Right => {
+                        Some(right.borrow().get_farthest_node_by_position(Position::Left))
+                    }
                 }
+            } else {
+                None
             }
         } else {
             None
+        }
+    }
+
+    fn get_magnitude(&self) -> i32 {
+        match &self.contents {
+            Contents::Regular(value) => *value,
+            Contents::Pair(left, right) => {
+                3 * left.borrow().get_magnitude() + 2 * right.borrow().get_magnitude()
+            }
         }
     }
 }
@@ -179,7 +184,7 @@ fn explode(root: &Rc<RefCell<Node>>) -> bool {
             }
 
             node_to_explode = Some(Weak::upgrade(&node.weak_self).unwrap());
-            return false;
+            false
         },
         0,
     );
@@ -279,13 +284,39 @@ fn reduce_list<I: Iterator<Item = String>>(mut list: I) -> Rc<RefCell<Node>> {
     left
 }
 
-fn main() {
-    // let file = File::open("input.txt").unwrap();
-    // let reader = BufReader::new(file);
+fn get_maximum_magnitude(numbers: &[String]) -> i32 {
+    let mut maximum = 0;
+    for (index, a) in numbers.iter().enumerate() {
+        for b in &numbers[index + 1..] {
+            let forwards = Node::new_pair(
+                Node::parse_from_bytes(a.as_bytes()).0,
+                Node::parse_from_bytes(b.as_bytes()).0,
+            );
+            reduce(&forwards);
+            maximum = maximum.max(forwards.borrow().get_magnitude());
 
-    let root =
-        Node::parse_from_bytes(String::from("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]").as_bytes()).0;
-    reduce(&root);
+            let backwards = Node::new_pair(
+                Node::parse_from_bytes(b.as_bytes()).0,
+                Node::parse_from_bytes(a.as_bytes()).0,
+            );
+            reduce(&backwards);
+            maximum = maximum.max(backwards.borrow().get_magnitude());
+        }
+    }
+    maximum
+}
+
+fn main() {
+    let file = File::open("input.txt").unwrap();
+    let reader = BufReader::new(file);
+    // println!(
+    //     "Magnitude: {}",
+    //     reduce_list(reader.lines().map(|line| line.unwrap()))
+    //         .borrow()
+    //         .get_magnitude()
+    // )
+    let lines: Vec<_> = reader.lines().map(|line| line.unwrap()).collect();
+    println!("Maximum magnitude: {}", get_maximum_magnitude(&lines));
 }
 
 #[cfg(test)]
@@ -414,10 +445,42 @@ mod tests {
         );
     }
 
-    // #[bench]
-    // fn bench_input(b: &mut Bencher) {
-    //     b.iter(|| {
-    //         assert_eq!(get_possible_values(241..=273, -97..=-63).len(), 1908);
-    //     })
-    // }
+    #[test]
+    fn test_magnitude() {
+        assert_eq!(
+            Node::parse_from_bytes(String::from("[[1,2],[[3,4],5]]").as_bytes())
+                .0
+                .borrow()
+                .get_magnitude(),
+            143
+        );
+    }
+
+    #[test]
+    fn test_example_magnitude() {
+        let list = [
+            String::from("[[[0,[5,8]],[[1,7],[9,6]]],[[4,[1,2]],[[1,4],2]]]"),
+            String::from("[[[5,[2,8]],4],[5,[[9,9],0]]]"),
+            String::from("[6,[[[6,2],[5,6]],[[7,6],[4,7]]]]"),
+            String::from("[[[6,[0,7]],[0,9]],[4,[9,[9,0]]]]"),
+            String::from("[[[7,[6,4]],[3,[1,3]]],[[[5,5],1],9]]"),
+            String::from("[[6,[[7,3],[3,2]]],[[[3,8],[5,7]],4]]"),
+            String::from("[[[[5,4],[7,7]],8],[[8,3],8]]"),
+            String::from("[[9,3],[[9,9],[6,[4,9]]]]"),
+            String::from("[[2,[[7,7],7]],[[5,8],[[9,3],[0,2]]]]"),
+            String::from("[[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]]"),
+        ];
+        assert_eq!(reduce_list(list.into_iter()).borrow().get_magnitude(), 4140);
+    }
+
+    #[bench]
+    fn bench_input(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let lines: Vec<_> = reader.lines().map(|line| line.unwrap()).collect();
+
+        b.iter(|| {
+            assert_eq!(get_maximum_magnitude(&lines), 4638);
+        })
+    }
 }
