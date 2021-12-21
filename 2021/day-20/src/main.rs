@@ -65,11 +65,24 @@ fn run_iterations(
     let mut padding = 1;
     let mut background = b'.';
     for _ in 0..iterations {
-        for y in -padding..(height as i16 + padding) {
-            for x in -padding..(width as i16 + padding) {
-                let flattened = OFFSETS
-                    .iter()
-                    .fold(0u16, |accumulator, (offset_x, offset_y)| {
+        for x in -padding..(width as i16 + padding) {
+            let mut previous_flattened = None;
+            for y in -padding..(height as i16 + padding) {
+                let accumulator = if let Some(previous) = previous_flattened {
+                    previous & 0x3F
+                } else {
+                    0
+                };
+
+                let start = if previous_flattened.is_some() {
+                    6
+                } else {
+                    0
+                };
+
+                let flattened = OFFSETS[start..].iter().fold(
+                    accumulator,
+                    |accumulator, (offset_x, offset_y)| {
                         let x = x + offset_x;
                         let y = y + offset_y;
                         (accumulator << 1)
@@ -84,10 +97,13 @@ fn run_iterations(
                             } else {
                                 0
                             }
-                    });
+                    },
+                );
                 if algorithm[flattened as usize] == b'#' {
                     new_pixels.insert((x, y));
                 }
+
+                previous_flattened = Some(flattened);
             }
         }
 
@@ -107,7 +123,6 @@ fn main() {
     let reader = BufReader::new(file);
     let (algorithm, light_pixels, width, height) =
         parse_input(reader.lines().map(|line| line.unwrap()));
-    println!("Lit pixels: {}", light_pixels.len());
     let light_pixels = run_iterations(&algorithm, light_pixels, width, height, 50);
     println!("Lit pixels: {}", light_pixels.len());
 }
