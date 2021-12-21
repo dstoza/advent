@@ -67,22 +67,24 @@ fn run_iterations(
     for _ in 0..iterations {
         for y in -padding..(height as i16 + padding) {
             for x in -padding..(width as i16 + padding) {
-                let neighborhood: Vec<_> = OFFSETS
+                let flattened = OFFSETS
                     .iter()
-                    .map(|(offset_x, offset_y)| {
+                    .fold(0u16, |accumulator, (offset_x, offset_y)| {
                         let x = x + offset_x;
                         let y = y + offset_y;
-                        if x <= -padding || y <= -padding || x >= (width as i16) + padding - 1 || y >= (height as i16) + padding - 1 {
-                            background
-                        } else if light_pixels.contains(&(x, y)) {
-                            b'#'
-                        } else {
-                            b'.'
-                        }
-                    })
-                    .collect();
-                let neighborhood: [u8; 9] = neighborhood.try_into().unwrap();
-                let flattened = flatten(neighborhood);
+                        (accumulator << 1)
+                            + if x <= -padding
+                                || y <= -padding
+                                || x >= (width as i16) + padding - 1
+                                || y >= (height as i16) + padding - 1
+                            {
+                                (background == b'#') as u16
+                            } else if light_pixels.contains(&(x, y)) {
+                                1
+                            } else {
+                                0
+                            }
+                    });
                 if algorithm[flattened as usize] == b'#' {
                     new_pixels.insert((x, y));
                 }
@@ -150,7 +152,13 @@ mod tests {
     #[test]
     fn test_iterate() {
         let (algorithm, light_pixels, width, height) = parse_input(get_example().into_iter());
-        assert_eq!(run_iterations(&algorithm, light_pixels.clone(), width, height, 1).len(), 24);
-        assert_eq!(run_iterations(&algorithm, light_pixels.clone(), width, height, 2).len(), 35);
+        assert_eq!(
+            run_iterations(&algorithm, light_pixels.clone(), width, height, 1).len(),
+            24
+        );
+        assert_eq!(
+            run_iterations(&algorithm, light_pixels.clone(), width, height, 2).len(),
+            35
+        );
     }
 }
