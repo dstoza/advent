@@ -11,129 +11,129 @@ use nalgebra::{point, Point3};
 
 #[derive(Clone, Copy)]
 enum Orientation {
-    FacingPositiveZUpPositiveY,
-    FacingPositiveZUpPositiveX,
-    FacingPositiveZUpNegativeY,
-    FacingPositiveZUpNegativeX,
-    FacingNegativeZUpPositiveY,
-    FacingNegativeZUpNegativeX,
-    FacingNegativeZUpNegativeY,
-    FacingNegativeZUpPositiveX,
-    FacingPositiveXUpPositiveY,
-    FacingPositiveXUpNegativeZ,
-    FacingPositiveXUpNegativeY,
-    FacingPositiveXUpPositiveZ,
-    FacingNegativeXUpPositiveY,
-    FacingNegativeXUpPositiveZ,
-    FacingNegativeXUpNegativeY,
-    FacingNegativeXUpNegativeZ,
-    FacingPositiveYUpNegativeZ,
-    FacingPositiveYUpPositiveX,
-    FacingPositiveYUpPositiveZ,
-    FacingPositiveYUpNegativeX,
-    FacingNegativeYUpNegativeZ,
-    FacingNegativeYUpNegativeX,
-    FacingNegativeYUpPositiveZ,
-    FacingNegativeYUpPositiveX,
+    PositiveZUpPositiveY,
+    PositiveZUpPositiveX,
+    PositiveZUpNegativeY,
+    PositiveZUpNegativeX,
+    NegativeZUpPositiveY,
+    NegativeZUpNegativeX,
+    NegativeZUpNegativeY,
+    NegativeZUpPositiveX,
+    PositiveXUpPositiveY,
+    PositiveXUpNegativeZ,
+    PositiveXUpNegativeY,
+    PositiveXUpPositiveZ,
+    NegativeXUpPositiveY,
+    NegativeXUpPositiveZ,
+    NegativeXUpNegativeY,
+    NegativeXUpNegativeZ,
+    PositiveYUpNegativeZ,
+    PositiveYUpPositiveX,
+    PositiveYUpPositiveZ,
+    PositiveYUpNegativeX,
+    NegativeYUpNegativeZ,
+    NegativeYUpNegativeX,
+    NegativeYUpPositiveZ,
+    NegativeYUpPositiveX,
 }
 
 const ORIENTATIONS: [Orientation; 24] = [
-    Orientation::FacingPositiveZUpPositiveY,
-    Orientation::FacingPositiveZUpPositiveX,
-    Orientation::FacingPositiveZUpNegativeY,
-    Orientation::FacingPositiveZUpNegativeX,
-    Orientation::FacingNegativeZUpPositiveY,
-    Orientation::FacingNegativeZUpNegativeX,
-    Orientation::FacingNegativeZUpNegativeY,
-    Orientation::FacingNegativeZUpPositiveX,
-    Orientation::FacingPositiveXUpPositiveY,
-    Orientation::FacingPositiveXUpNegativeZ,
-    Orientation::FacingPositiveXUpNegativeY,
-    Orientation::FacingPositiveXUpPositiveZ,
-    Orientation::FacingNegativeXUpPositiveY,
-    Orientation::FacingNegativeXUpPositiveZ,
-    Orientation::FacingNegativeXUpNegativeY,
-    Orientation::FacingNegativeXUpNegativeZ,
-    Orientation::FacingPositiveYUpNegativeZ,
-    Orientation::FacingPositiveYUpPositiveX,
-    Orientation::FacingPositiveYUpPositiveZ,
-    Orientation::FacingPositiveYUpNegativeX,
-    Orientation::FacingNegativeYUpNegativeZ,
-    Orientation::FacingNegativeYUpNegativeX,
-    Orientation::FacingNegativeYUpPositiveZ,
-    Orientation::FacingNegativeYUpPositiveX,
+    Orientation::PositiveZUpPositiveY,
+    Orientation::PositiveZUpPositiveX,
+    Orientation::PositiveZUpNegativeY,
+    Orientation::PositiveZUpNegativeX,
+    Orientation::NegativeZUpPositiveY,
+    Orientation::NegativeZUpNegativeX,
+    Orientation::NegativeZUpNegativeY,
+    Orientation::NegativeZUpPositiveX,
+    Orientation::PositiveXUpPositiveY,
+    Orientation::PositiveXUpNegativeZ,
+    Orientation::PositiveXUpNegativeY,
+    Orientation::PositiveXUpPositiveZ,
+    Orientation::NegativeXUpPositiveY,
+    Orientation::NegativeXUpPositiveZ,
+    Orientation::NegativeXUpNegativeY,
+    Orientation::NegativeXUpNegativeZ,
+    Orientation::PositiveYUpNegativeZ,
+    Orientation::PositiveYUpPositiveX,
+    Orientation::PositiveYUpPositiveZ,
+    Orientation::PositiveYUpNegativeX,
+    Orientation::NegativeYUpNegativeZ,
+    Orientation::NegativeYUpNegativeX,
+    Orientation::NegativeYUpPositiveZ,
+    Orientation::NegativeYUpPositiveX,
 ];
 
 fn orient_coordinates(coordinates: &Point3<i32>, orientation: Orientation) -> Point3<i32> {
     match orientation {
-        Orientation::FacingPositiveZUpPositiveY => *coordinates,
-        Orientation::FacingPositiveZUpPositiveX => {
+        Orientation::PositiveZUpPositiveY => *coordinates,
+        Orientation::PositiveZUpPositiveX => {
             point![-coordinates.y, coordinates.x, coordinates.z]
         }
-        Orientation::FacingPositiveZUpNegativeY => {
+        Orientation::PositiveZUpNegativeY => {
             point![-coordinates.x, -coordinates.y, coordinates.z]
         }
-        Orientation::FacingPositiveZUpNegativeX => {
+        Orientation::PositiveZUpNegativeX => {
             point![coordinates.y, -coordinates.x, coordinates.z]
         }
-        Orientation::FacingNegativeZUpPositiveY => {
+        Orientation::NegativeZUpPositiveY => {
             point![-coordinates.x, coordinates.y, -coordinates.z]
         }
-        Orientation::FacingNegativeZUpNegativeX => {
+        Orientation::NegativeZUpNegativeX => {
             point![-coordinates.y, -coordinates.x, -coordinates.z]
         }
-        Orientation::FacingNegativeZUpNegativeY => {
+        Orientation::NegativeZUpNegativeY => {
             point![coordinates.x, -coordinates.y, -coordinates.z]
         }
-        Orientation::FacingNegativeZUpPositiveX => {
+        Orientation::NegativeZUpPositiveX => {
             point![coordinates.y, coordinates.x, -coordinates.z]
         }
-        Orientation::FacingPositiveXUpPositiveY => {
+        Orientation::PositiveXUpPositiveY => {
             point![-coordinates.z, coordinates.y, coordinates.x]
         }
-        Orientation::FacingPositiveXUpNegativeZ => {
+        Orientation::PositiveXUpNegativeZ => {
             point![-coordinates.y, -coordinates.z, coordinates.x]
         }
-        Orientation::FacingPositiveXUpNegativeY => {
+        Orientation::PositiveXUpNegativeY => {
             point![coordinates.z, -coordinates.y, coordinates.x]
         }
-        Orientation::FacingPositiveXUpPositiveZ => {
+        Orientation::PositiveXUpPositiveZ => {
             point![coordinates.y, coordinates.z, coordinates.x]
         }
-        Orientation::FacingNegativeXUpPositiveY => {
+        Orientation::NegativeXUpPositiveY => {
             point![coordinates.z, coordinates.y, -coordinates.x]
         }
-        Orientation::FacingNegativeXUpPositiveZ => {
+        Orientation::NegativeXUpPositiveZ => {
             point![-coordinates.y, coordinates.z, -coordinates.x]
         }
-        Orientation::FacingNegativeXUpNegativeY => {
+        Orientation::NegativeXUpNegativeY => {
             point![-coordinates.z, -coordinates.y, -coordinates.x]
         }
-        Orientation::FacingNegativeXUpNegativeZ => {
+        Orientation::NegativeXUpNegativeZ => {
             point![coordinates.y, -coordinates.z, -coordinates.x]
         }
-        Orientation::FacingPositiveYUpNegativeZ => {
+        Orientation::PositiveYUpNegativeZ => {
             point![coordinates.x, -coordinates.z, coordinates.y]
         }
-        Orientation::FacingPositiveYUpPositiveX => {
+        Orientation::PositiveYUpPositiveX => {
             point![coordinates.z, coordinates.x, coordinates.y]
         }
-        Orientation::FacingPositiveYUpPositiveZ => {
+        Orientation::PositiveYUpPositiveZ => {
             point![-coordinates.x, coordinates.z, coordinates.y]
         }
-        Orientation::FacingPositiveYUpNegativeX => {
+        Orientation::PositiveYUpNegativeX => {
             point![-coordinates.z, -coordinates.x, coordinates.y]
         }
-        Orientation::FacingNegativeYUpNegativeZ => {
+        Orientation::NegativeYUpNegativeZ => {
             point![-coordinates.x, -coordinates.z, -coordinates.y]
         }
-        Orientation::FacingNegativeYUpNegativeX => {
+        Orientation::NegativeYUpNegativeX => {
             point![coordinates.z, -coordinates.x, -coordinates.y]
         }
-        Orientation::FacingNegativeYUpPositiveZ => {
+        Orientation::NegativeYUpPositiveZ => {
             point![coordinates.x, coordinates.z, -coordinates.y]
         }
-        Orientation::FacingNegativeYUpPositiveX => {
+        Orientation::NegativeYUpPositiveX => {
             point![-coordinates.z, coordinates.x, -coordinates.y]
         }
     }
@@ -141,6 +141,7 @@ fn orient_coordinates(coordinates: &Point3<i32>, orientation: Orientation) -> Po
 
 struct Scanner {
     relative_beacons: Vec<Point3<i32>>,
+    absolute_position: Point3<i32>,
     absolute_beacons: Vec<Point3<i32>>,
     anchor_relative_beacons: Vec<HashSet<Point3<i32>>>,
 }
@@ -159,6 +160,7 @@ impl Scanner {
                     ]
                 })
                 .collect(),
+            absolute_position: point![0, 0, 0],
             absolute_beacons: Vec::new(),
             anchor_relative_beacons: Vec::new(),
         }
@@ -193,22 +195,21 @@ impl Scanner {
         anchor_beacon: Point3<i32>,
         common_beacon: Point3<i32>,
     ) {
-        let absolute_beacons = self
-            .get_oriented_relative_beacons(orientation)
+        let oriented_relative_beacons = self.get_oriented_relative_beacons(orientation);
+        let absolute_beacons = oriented_relative_beacons
             .iter()
-            .map(|beacon| {
-                let transformed_to_absolute = beacon + (anchor_beacon - common_beacon);
-                transformed_to_absolute
-            })
+            .map(|beacon| beacon + (anchor_beacon - common_beacon))
             .collect();
         self.resolve(absolute_beacons);
+        self.absolute_position =
+            Point3::origin() + (self.absolute_beacons[0] - oriented_relative_beacons[0]);
     }
 
     fn try_resolve_against(&mut self, anchor: &Self) -> bool {
         for orientation in ORIENTATIONS {
             let oriented_relative_beacons = self.get_oriented_relative_beacons(orientation);
 
-            for (common_index, common_beacon) in oriented_relative_beacons.iter().enumerate() {
+            for common_beacon in oriented_relative_beacons.iter() {
                 let common_relative_beacons: HashSet<_> = oriented_relative_beacons
                     .iter()
                     .map(|beacon| Point3::origin() + (beacon - common_beacon))
@@ -237,11 +238,8 @@ impl Scanner {
 
 fn parse_scanners<I: Iterator<Item = String>>(mut lines: I) -> Vec<Scanner> {
     let mut scanners = Vec::new();
-    loop {
-        match lines.next() {
-            Some(_) => scanners.push(Scanner::from_lines(&mut lines)),
-            None => break,
-        }
+    while let Some(_) = lines.next() {
+        scanners.push(Scanner::from_lines(&mut lines));
     }
     scanners
 }
@@ -265,7 +263,7 @@ fn resolve_scanners(scanners: &mut Vec<Scanner>) {
             }
         }
 
-        complete.extend(anchors.drain(..));
+        complete.append(&mut anchors);
 
         // Basically drain_filter, but it isn't stable yet
         let mut index = 0;
@@ -278,7 +276,7 @@ fn resolve_scanners(scanners: &mut Vec<Scanner>) {
         }
     }
 
-    complete.extend(anchors.drain(..));
+    complete.append(&mut anchors);
     std::mem::swap(scanners, &mut complete);
 }
 
@@ -288,8 +286,24 @@ fn main() {
     let mut scanners = parse_scanners(reader.lines().map(|line| line.unwrap()));
     println!("Found {} scanners", scanners.len());
     resolve_scanners(&mut scanners);
-    let unique: HashSet<_> = scanners.iter().flat_map(|scanner| scanner.absolute_beacons.iter()).collect();
-    println!("Found {} unique points", unique.len());
+    // let unique: HashSet<_> = scanners
+    //     .iter()
+    //     .flat_map(|scanner| scanner.absolute_beacons.iter())
+    //     .collect();
+    // println!("Found {} unique points", unique.len());
+    let mut max_distance = 0;
+    for i in 0..scanners.len() {
+        let left_position = scanners[i].absolute_position;
+        for scanner in scanners.iter().skip(i + 1) {
+            let right_position = scanner.absolute_position;
+            max_distance = max_distance.max(
+                (left_position.x - right_position.x).abs()
+                    + (left_position.y - right_position.y).abs()
+                    + (left_position.z - right_position.z).abs(),
+            )
+        }
+    }
+    println!("Max distance: {}", max_distance);
 }
 
 #[cfg(test)]
@@ -377,6 +391,7 @@ mod tests {
         let resolved = scanners.pop().unwrap();
 
         assert_eq!(scanners[0].try_resolve_against(&resolved), true);
+        println!("Resolved position {:?}", scanners[0].absolute_position);
     }
 
     // #[bench]
