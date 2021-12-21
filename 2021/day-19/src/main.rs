@@ -164,6 +164,10 @@ impl Scanner {
         }
     }
 
+    fn is_resolved(&self) -> bool {
+        !self.absolute_beacons.is_empty()
+    }
+
     fn resolve(&mut self, absolute_beacons: Vec<Point3<i32>>) {
         self.absolute_beacons = absolute_beacons;
         for beacon in &self.absolute_beacons[..self.absolute_beacons.len() - 11] {
@@ -242,9 +246,50 @@ fn parse_scanners<I: Iterator<Item = String>>(mut lines: I) -> Vec<Scanner> {
     scanners
 }
 
+fn resolve_scanners(scanners: &mut Vec<Scanner>) {
+    let last = scanners.len() - 1;
+    scanners.swap(0, last);
+    let mut resolved = scanners.pop().unwrap();
+    let absolute_beacons = resolved.relative_beacons.clone();
+    resolved.resolve(absolute_beacons);
+
+    let mut complete = Vec::new();
+    let mut anchors = vec![resolved];
+    let mut unresolved: Vec<_> = scanners.drain(..).collect();
+    while !unresolved.is_empty() {
+        for scanner in &mut unresolved {
+            for anchor in &anchors {
+                if scanner.try_resolve_against(anchor) {
+                    break;
+                }
+            }
+        }
+
+        complete.extend(anchors.drain(..));
+
+        // Basically drain_filter, but it isn't stable yet
+        let mut index = 0;
+        while index < unresolved.len() {
+            if unresolved[index].is_resolved() {
+                anchors.push(unresolved.remove(index));
+            } else {
+                index += 1;
+            }
+        }
+    }
+
+    complete.extend(anchors.drain(..));
+    std::mem::swap(scanners, &mut complete);
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
+    let mut scanners = parse_scanners(reader.lines().map(|line| line.unwrap()));
+    println!("Found {} scanners", scanners.len());
+    resolve_scanners(&mut scanners);
+    let unique: HashSet<_> = scanners.iter().flat_map(|scanner| scanner.absolute_beacons.iter()).collect();
+    println!("Found {} unique points", unique.len());
 }
 
 #[cfg(test)]
