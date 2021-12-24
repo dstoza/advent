@@ -4,12 +4,10 @@ extern crate test;
 
 use std::{
     cell::RefCell,
-    collections::VecDeque,
     fs::File,
     io::{BufRead, BufReader},
-    mem::swap,
     ops::Range,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 trait Intersection {
@@ -75,12 +73,8 @@ impl Node {
         root
     }
 
-    fn count_nodes(&self) -> usize {
-        1 + self
-            .children
-            .iter()
-            .map(|child| child.borrow().count_nodes())
-            .sum::<usize>()
+    fn is_empty(&self) -> bool {
+        !self.is_cube && self.children.is_empty()
     }
 
     fn count_cubes(&self) -> usize {
@@ -113,9 +107,6 @@ impl Node {
         }
 
         for (top_half_x, top_half_y, top_half_z) in HALF_PERMUTATIONS {
-            let subcube_index =
-                (top_half_x as usize) << 2 | (top_half_y as usize) << 1 | top_half_z as usize;
-
             let x = if top_half_x {
                 self.x + self.size / 2
             } else {
@@ -140,6 +131,8 @@ impl Node {
                 child.borrow_mut().is_cube = false;
             }
         }
+
+        self.is_cube = false;
     }
 
     fn get_child_index(&self, cube: &Node) -> usize {
@@ -176,6 +169,36 @@ impl Node {
         // Fix up completed cubes
         if self.children.iter().all(|child| child.borrow().is_cube) {
             self.is_cube = true;
+            self.children.clear();
+        }
+    }
+
+    fn remove_cube(&mut self, cube: &Node) {
+        assert!(cube.x >= self.x);
+        assert!(cube.y >= self.y);
+        assert!(cube.z >= self.z);
+        assert!(cube.size < self.size);
+
+        // If we're already in an empty cube, we're done
+        if !self.is_cube && self.children.is_empty() {
+            return;
+        }
+
+        self.subdivide_if_necessary();
+        let child_index = self.get_child_index(cube);
+
+        // Descend to the parent of the cube to be removed
+        if self.size > 2 * cube.size {
+            self.children[child_index].borrow_mut().remove_cube(cube);
+        } else {
+            let mut child = self.children[child_index].borrow_mut();
+            // Otherwise we are the parent node of the cube to be removed
+            child.is_cube = false;
+            child.children.clear();
+        }
+
+        // Fix up removed cubes
+        if self.children.iter().all(|child| child.borrow().is_empty()) {
             self.children.clear();
         }
     }
@@ -300,9 +323,45 @@ impl Step {
     }
 }
 
+fn run_steps(steps: &[Step]) -> i32 {
+    let root = Node::create_root();
+
+    for step in steps {
+        let cubes = step.slice_into_cubes();
+        match step.command {
+            Command::Off => {
+                for cube in cubes {
+                    root.borrow_mut().remove_cube(&cube.borrow());
+                }
+            }
+            Command::On => {
+                for cube in cubes {
+                    root.borrow_mut().insert_cube(&cube.borrow());
+                }
+            }
+        }
+    }
+
+    let volume = root.borrow().get_volume();
+    volume
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
+    let mut steps = Step::parse_from_lines(reader.lines().map(std::result::Result::unwrap));
+    let steps: Vec<_> = steps
+        .drain(..)
+        .filter(|step| {
+            step.x.start >= -50
+                && step.x.end <= 50
+                && step.y.start >= -50
+                && step.y.end <= 50
+                && step.z.start >= -50
+                && step.z.end <= 50
+        })
+        .collect();
+    println!("Volume: {}", run_steps(&steps));
 }
 
 #[cfg(test)]
@@ -316,6 +375,31 @@ mod tests {
             String::from("on x=11..13,y=11..13,z=11..13"),
             String::from("off x=9..11,y=9..11,z=9..11"),
             String::from("on x=10..10,y=10..10,z=10..10"),
+        ]
+    }
+
+    fn get_larger_example() -> [String; 20] {
+        [
+            String::from("on x=-20..26,y=-36..17,z=-47..7"),
+            String::from("on x=-20..33,y=-21..23,z=-26..28"),
+            String::from("on x=-22..28,y=-29..23,z=-38..16"),
+            String::from("on x=-46..7,y=-6..46,z=-50..-1"),
+            String::from("on x=-49..1,y=-3..46,z=-24..28"),
+            String::from("on x=2..47,y=-22..22,z=-23..27"),
+            String::from("on x=-27..23,y=-28..26,z=-21..29"),
+            String::from("on x=-39..5,y=-6..47,z=-3..44"),
+            String::from("on x=-30..21,y=-8..43,z=-13..34"),
+            String::from("on x=-22..26,y=-27..20,z=-29..19"),
+            String::from("off x=-48..-32,y=26..41,z=-47..-37"),
+            String::from("on x=-12..35,y=6..50,z=-50..-2"),
+            String::from("off x=-48..-32,y=-32..-16,z=-15..-5"),
+            String::from("on x=-18..26,y=-33..15,z=-7..46"),
+            String::from("off x=-40..-22,y=-38..-28,z=23..41"),
+            String::from("on x=-16..35,y=-41..10,z=-47..6"),
+            String::from("off x=-32..-23,y=11..30,z=-14..3"),
+            String::from("on x=-49..-5,y=-3..45,z=-29..18"),
+            String::from("off x=18..30,y=-20..-8,z=-3..13"),
+            String::from("on x=-41..9,y=-7..43,z=-33..15"),
         ]
     }
 
@@ -390,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut root = Node::create_root();
+        let root = Node::create_root();
 
         root.borrow_mut()
             .insert_cube(&Node::new(0, 0, 0, 1).borrow());
@@ -407,8 +491,38 @@ mod tests {
             .insert_cube(&Node::new(-2, -2, -2, 2).borrow());
         assert_eq!(root.borrow().count_cubes(), 2);
         assert_eq!(root.borrow().get_volume(), 16);
+    }
 
-        
+    #[test]
+    fn test_remove() {
+        let root = Node::create_root();
+
+        root.borrow_mut()
+            .insert_cube(&Node::new(0, 0, 0, 2).borrow());
+        assert_eq!(root.borrow().count_cubes(), 1);
+        assert_eq!(root.borrow().get_volume(), 8);
+
+        root.borrow_mut()
+            .remove_cube(&Node::new(0, 0, 0, 1).borrow());
+        assert_eq!(root.borrow().count_cubes(), 7);
+        assert_eq!(root.borrow().get_volume(), 7);
+
+        root.borrow_mut()
+            .insert_cube(&Node::new(0, 0, 0, 1).borrow());
+        assert_eq!(root.borrow().count_cubes(), 1);
+        assert_eq!(root.borrow().get_volume(), 8);
+    }
+
+    #[test]
+    fn test_basic_example() {
+        let steps = Step::parse_from_lines(get_basic_example().into_iter());
+        assert_eq!(run_steps(&steps), 39);
+    }
+
+    #[test]
+    fn test_larger_example() {
+        let steps = Step::parse_from_lines(get_larger_example().into_iter());
+        assert_eq!(run_steps(&steps), 590784);
     }
 
     // #[bench]
