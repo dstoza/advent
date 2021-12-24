@@ -9,7 +9,7 @@ use std::{
     io::{BufRead, BufReader},
     mem::swap,
     ops::Range,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 trait Intersection {
@@ -28,7 +28,18 @@ impl<T: Copy + Ord> Intersection for Range<T> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+const HALF_PERMUTATIONS: [(bool, bool, bool); 8] = [
+    (false, false, false),
+    (false, false, true),
+    (false, true, false),
+    (false, true, true),
+    (true, false, false),
+    (true, false, true),
+    (true, true, false),
+    (true, true, true),
+];
+
+#[derive(Debug)]
 struct Node {
     x: i32,
     y: i32,
@@ -41,29 +52,142 @@ struct Node {
 impl Node {
     const MAX_VALUE: i32 = 128 * 1024;
 
-    fn create_root() -> Self {
-        Self {
-            x: -Node::MAX_VALUE,
-            y: -Node::MAX_VALUE,
-            z: -Node::MAX_VALUE,
-            size: 2 * Node::MAX_VALUE,
-            is_cube: false,
-            children: Vec::new(),
-        }
-    }
-
-    fn new(x: i32, y: i32, z: i32, size: i32) -> Self {
+    fn new(x: i32, y: i32, z: i32, size: i32) -> Rc<RefCell<Self>> {
         assert!(size > 0);
-        Self {
+        Rc::new(RefCell::new(Self {
             x,
             y,
             z,
             size,
             is_cube: true,
             children: Vec::new(),
+        }))
+    }
+
+    fn create_root() -> Rc<RefCell<Self>> {
+        let root = Self::new(
+            -Node::MAX_VALUE,
+            -Node::MAX_VALUE,
+            -Node::MAX_VALUE,
+            2 * Node::MAX_VALUE,
+        );
+        root.borrow_mut().is_cube = false;
+        root
+    }
+
+    fn count_nodes(&self) -> usize {
+        1 + self
+            .children
+            .iter()
+            .map(|child| child.borrow().count_nodes())
+            .sum::<usize>()
+    }
+
+    fn count_cubes(&self) -> usize {
+        (self.is_cube as usize)
+            + self
+                .children
+                .iter()
+                .map(|child| child.borrow().count_cubes())
+                .sum::<usize>()
+    }
+
+    fn get_volume(&self) -> i32 {
+        let self_volume = if self.is_cube {
+            self.size * self.size * self.size
+        } else {
+            0
+        };
+
+        self_volume
+            + self
+                .children
+                .iter()
+                .map(|child| child.borrow().get_volume())
+                .sum::<i32>()
+    }
+
+    fn subdivide_if_necessary(&mut self) {
+        if !self.is_cube && !self.children.is_empty() {
+            return;
+        }
+
+        for (top_half_x, top_half_y, top_half_z) in HALF_PERMUTATIONS {
+            let subcube_index =
+                (top_half_x as usize) << 2 | (top_half_y as usize) << 1 | top_half_z as usize;
+
+            let x = if top_half_x {
+                self.x + self.size / 2
+            } else {
+                self.x
+            };
+            let y = if top_half_y {
+                self.y + self.size / 2
+            } else {
+                self.y
+            };
+            let z = if top_half_z {
+                self.z + self.size / 2
+            } else {
+                self.z
+            };
+
+            self.children.push(Node::new(x, y, z, self.size / 2));
+        }
+
+        if !self.is_cube {
+            for child in &mut self.children {
+                child.borrow_mut().is_cube = false;
+            }
+        }
+    }
+
+    fn get_child_index(&self, cube: &Node) -> usize {
+        let top_x = cube.x >= self.x + self.size / 2;
+        let top_y = cube.y >= self.y + self.size / 2;
+        let top_z = cube.z >= self.z + self.size / 2;
+        (top_x as usize) << 2 | (top_y as usize) << 1 | top_z as usize
+    }
+
+    fn insert_cube(&mut self, cube: &Node) {
+        assert!(cube.x >= self.x);
+        assert!(cube.y >= self.y);
+        assert!(cube.z >= self.z);
+        assert!(cube.size < self.size);
+
+        // If we're already in an ancestor that is a full cube, we're done
+        if self.is_cube {
+            return;
+        }
+
+        self.subdivide_if_necessary();
+        let child_index = self.get_child_index(cube);
+
+        // Descend to the parent of the cube to be inserted
+        if self.size > 2 * cube.size {
+            self.children[child_index].borrow_mut().insert_cube(cube);
+        } else {
+            // Otherwise we are the parent node of the cube to be inserted
+            let mut child = self.children[child_index].borrow_mut();
+            child.is_cube = true;
+            child.children.clear();
+        }
+
+        // Fix up completed cubes
+        if self.children.iter().all(|child| child.borrow().is_cube) {
+            self.is_cube = true;
+            self.children.clear();
         }
     }
 }
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z && self.size == other.size
+    }
+}
+
+impl Eq for Node {}
 
 #[derive(Debug, Eq, PartialEq)]
 enum Command {
@@ -127,7 +251,12 @@ impl Step {
             .collect()
     }
 
-    fn get_cubes_from(&self, x: Range<i32>, y: Range<i32>, z: Range<i32>) -> Vec<Node> {
+    fn get_cubes_from(
+        &self,
+        x: Range<i32>,
+        y: Range<i32>,
+        z: Range<i32>,
+    ) -> Vec<Rc<RefCell<Node>>> {
         if self.x.intersection(&x).unwrap() == x
             && self.y.intersection(&y).unwrap() == y
             && self.z.intersection(&z).unwrap() == z
@@ -140,28 +269,19 @@ impl Step {
 
         let mut nodes = Vec::new();
 
-        for (use_top_x, use_top_y, use_top_z) in [
-            (false, false, false),
-            (false, false, true),
-            (false, true, false),
-            (false, true, true),
-            (true, false, false),
-            (true, false, true),
-            (true, true, false),
-            (true, true, true),
-        ] {
+        for (use_top_x, use_top_y, use_top_z) in HALF_PERMUTATIONS {
             let half_x = get_half_range(&x, use_top_x);
-            if !half_x.intersection(&self.x).is_some() {
+            if half_x.intersection(&self.x).is_none() {
                 continue;
             }
 
             let half_y = get_half_range(&y, use_top_y);
-            if !half_y.intersection(&self.y).is_some() {
+            if half_y.intersection(&self.y).is_none() {
                 continue;
             }
 
             let half_z = get_half_range(&z, use_top_z);
-            if !half_z.intersection(&self.z).is_some() {
+            if half_z.intersection(&self.z).is_none() {
                 continue;
             }
 
@@ -171,7 +291,7 @@ impl Step {
         nodes
     }
 
-    fn slice_into_cubes(&self) -> Vec<Node> {
+    fn slice_into_cubes(&self) -> Vec<Rc<RefCell<Node>>> {
         self.get_cubes_from(
             -Node::MAX_VALUE..Node::MAX_VALUE,
             -Node::MAX_VALUE..Node::MAX_VALUE,
@@ -266,6 +386,29 @@ mod tests {
 
         let cubes = Step::new(Command::On, -16..16, -16..16, -16..16).slice_into_cubes();
         assert_eq!(cubes.len(), 8);
+    }
+
+    #[test]
+    fn test_insert() {
+        let mut root = Node::create_root();
+
+        root.borrow_mut()
+            .insert_cube(&Node::new(0, 0, 0, 1).borrow());
+        // assert_eq!(root.borrow().count_nodes(), );
+        assert_eq!(root.borrow().count_cubes(), 1);
+        assert_eq!(root.borrow().get_volume(), 1);
+
+        root.borrow_mut()
+            .insert_cube(&Node::new(0, 0, 0, 2).borrow());
+        assert_eq!(root.borrow().count_cubes(), 1);
+        assert_eq!(root.borrow().get_volume(), 8);
+
+        root.borrow_mut()
+            .insert_cube(&Node::new(-2, -2, -2, 2).borrow());
+        assert_eq!(root.borrow().count_cubes(), 2);
+        assert_eq!(root.borrow().get_volume(), 16);
+
+        
     }
 
     // #[bench]
