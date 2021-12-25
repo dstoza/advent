@@ -2,8 +2,11 @@
 #![feature(test)]
 extern crate test;
 
+use bitvec::prelude::*;
+
 use std::{
     cell::RefCell,
+    collections::HashSet,
     fs::File,
     io::{BufRead, BufReader},
     ops::Range,
@@ -346,22 +349,87 @@ fn run_steps(steps: &[Step]) -> i32 {
     volume
 }
 
+fn get_sorted<I: Iterator<Item = i32>>(items: I) -> Vec<i32> {
+    let mut items: Vec<i32> = items.collect();
+    items.sort_unstable();
+    items
+}
+
+fn run_2(steps: &[Step]) -> usize {
+    let mut x_values = HashSet::new();
+    let mut y_values = HashSet::new();
+    let mut z_values = HashSet::new();
+
+    for step in steps {
+        x_values.insert(step.x.start);
+        x_values.insert(step.x.end);
+        y_values.insert(step.y.start);
+        y_values.insert(step.y.end);
+        z_values.insert(step.z.start);
+        z_values.insert(step.z.end);
+    }
+
+    let x_values = get_sorted(x_values.drain());
+    let y_values = get_sorted(y_values.drain());
+    let z_values = get_sorted(z_values.drain());
+
+    let mut bitmap = bitvec![0; (x_values.len() - 1) * (y_values.len() - 1) * (z_values.len() - 1)];
+
+    for step in steps {
+        let x_start = x_values.binary_search(&step.x.start).unwrap();
+        let x_end = x_values.binary_search(&step.x.end).unwrap();
+        for x_index in x_start..x_end {
+            let x_offset = x_index * (y_values.len() - 1) * (z_values.len() - 1);
+            let y_start = y_values.binary_search(&step.y.start).unwrap();
+            let y_end = y_values.binary_search(&step.y.end).unwrap();
+            for y_index in y_start..y_end {
+                let y_offset = x_offset + y_index * (z_values.len() - 1);
+                let z_start = y_offset + z_values.binary_search(&step.z.start).unwrap();
+                let z_end = y_offset + z_values.binary_search(&step.z.end).unwrap();
+                bitmap[z_start..z_end].set_all(match step.command {
+                    Command::Off => false,
+                    Command::On => true,
+                });
+            }
+        }
+    }
+
+    let mut volume = 0;
+    for x_index in 0..x_values.len() - 1 {
+        let x_offset = x_index * (y_values.len() - 1) * (z_values.len() - 1);
+        let x_dimension = (x_values[x_index + 1] - x_values[x_index]) as usize;
+        for y_index in 0..y_values.len() - 1 {
+            let y_offset = x_offset + y_index * (z_values.len() - 1);
+            let y_dimension = (y_values[y_index + 1] - y_values[y_index]) as usize;
+            for z_index in 0..z_values.len() - 1 {
+                let z_offset = y_offset + z_index;
+                let z_dimension = (z_values[z_index + 1] - z_values[z_index]) as usize;
+                if bitmap[z_offset] {
+                    volume += x_dimension * y_dimension * z_dimension;
+                }
+            }
+        }
+    }
+
+    volume
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-    let mut steps = Step::parse_from_lines(reader.lines().map(std::result::Result::unwrap));
-    let steps: Vec<_> = steps
-        .drain(..)
-        .filter(|step| {
-            step.x.start >= -50
-                && step.x.end <= 50
-                && step.y.start >= -50
-                && step.y.end <= 50
-                && step.z.start >= -50
-                && step.z.end <= 50
-        })
-        .collect();
-    println!("Volume: {}", run_steps(&steps));
+    let steps = Step::parse_from_lines(reader.lines().map(std::result::Result::unwrap));
+    // let steps: Vec<_> = steps
+    //     .into_iter()
+    //     .filter(|step| {
+    //         step.x.start >= -50
+    //             && step.x.end <= 50
+    //             && step.y.start >= -50
+    //             && step.y.end <= 50
+    //             && step.z.start >= -50
+    //             && step.z.end <= 50
+    //     })
+    //     .collect();
+    println!("{}", run_2(&steps));
 }
 
 #[cfg(test)]
