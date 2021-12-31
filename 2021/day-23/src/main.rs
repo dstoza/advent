@@ -7,8 +7,6 @@ extern crate test;
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashSet},
-    fs::File,
-    io::{BufRead, BufReader},
 };
 
 use num_traits::FromPrimitive;
@@ -321,12 +319,7 @@ fn get_path_cost(path: &[Position], amphipod: Amphipod) -> usize {
 }
 
 fn get_closest_destination_for_amphipod(amphipod: Amphipod) -> Position {
-    match amphipod {
-        Amphipod::A1 | Amphipod::A2 | Amphipod::A3 | Amphipod::A4 => Position::RoomA1,
-        Amphipod::B1 | Amphipod::B2 | Amphipod::B3 | Amphipod::B4 => Position::RoomB1,
-        Amphipod::C1 | Amphipod::C2 | Amphipod::C3 | Amphipod::C4 => Position::RoomC1,
-        Amphipod::D1 | Amphipod::D2 | Amphipod::D3 | Amphipod::D4 => Position::RoomD1,
-    }
+    amphipod.get_room()[0]
 }
 
 fn get_estimated_completion_cost(configuration: Configuration, paths: &[Vec<Position>]) -> usize {
@@ -476,7 +469,9 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
     let mut popped = 0usize;
     let mut skipped_because_visited = 0usize;
     let mut paths_visited = 0usize;
+    let mut skipped_complete = 0usize;
     let mut skipped_because_of_invalid_destination = 0usize;
+    let mut skipped_new_visited_configuration = 0usize;
     let mut skipped_because_of_invalid_configuration = 0usize;
     let mut skipped_because_of_impure_room = 0usize;
     let mut max_cost = 0;
@@ -487,7 +482,7 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
         0usize,
         configuration,
     )));
-    while let Some(Reverse((_estimated_cost, actual_cost, configuration))) = queue.pop() {
+    while let Some(Reverse((estimated_cost, actual_cost, configuration))) = queue.pop() {
         popped += 1;
         if visited.contains(&configuration) {
             skipped_because_visited += 1;
@@ -499,18 +494,20 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
             return actual_cost;
         }
 
-        if _estimated_cost > max_cost {
-            // println!(
-            //     "max {} popped {} visited {} paths {} dest {} config {} impure {}",
-            //     _estimated_cost,
-            //     popped,
-            //     skipped_because_visited,
-            //     paths_visited,
-            //     skipped_because_of_invalid_destination,
-            //     skipped_because_of_invalid_configuration,
-            //     skipped_because_of_impure_room
-            // );
-            max_cost = _estimated_cost;
+        if estimated_cost > max_cost {
+            println!(
+                "max {} popped {} visited {} paths {} complete {} dest {} vdest {} config {} impure {}",
+                estimated_cost,
+                popped,
+                skipped_because_visited,
+                paths_visited,
+                skipped_complete,
+                skipped_because_of_invalid_destination,
+                skipped_new_visited_configuration,
+                skipped_because_of_invalid_configuration,
+                skipped_because_of_impure_room
+            );
+            max_cost = estimated_cost;
         }
 
         for path in paths.iter().filter(|path| {
@@ -522,6 +519,7 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
             paths_visited += 1;
 
             if position_is_complete(configuration, path[0]) {
+                skipped_complete += 1;
                 continue;
             }
 
@@ -543,6 +541,7 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
             new_configuration[amphipod as usize] = path[path.len() - 1];
 
             if visited.contains(&new_configuration) {
+                skipped_new_visited_configuration += 1;
                 continue;
             }
 
@@ -574,8 +573,6 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
 }
 
 fn main() {
-    let file = File::open("input.txt").unwrap();
-    let reader = BufReader::new(file);
     // organize_amphipods([
     //     Position::RoomASouth,
     //     Position::RoomDSouth,
