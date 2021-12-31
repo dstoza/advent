@@ -36,32 +36,34 @@ enum Position {
     RoomDSouth,
 }
 
+const ROOM_A: [Position; 2] = [Position::RoomANorth, Position::RoomASouth];
+const ROOM_B: [Position; 2] = [Position::RoomBNorth, Position::RoomBSouth];
+const ROOM_C: [Position; 2] = [Position::RoomCNorth, Position::RoomCSouth];
+const ROOM_D: [Position; 2] = [Position::RoomDNorth, Position::RoomDSouth];
+
 impl Position {
-    fn is_in_hallway(&self) -> bool {
-        match *self {
+    fn is_in_hallway(self) -> bool {
+        matches!(
+            self,
             Position::Hallway00
-            | Position::Hallway01
-            | Position::Hallway02
-            | Position::Hallway03
-            | Position::Hallway04
-            | Position::Hallway05
-            | Position::Hallway06
-            | Position::Hallway07
-            | Position::Hallway08
-            | Position::Hallway09
-            | Position::Hallway10 => true,
-            _ => false,
-        }
+                | Position::Hallway01
+                | Position::Hallway02
+                | Position::Hallway03
+                | Position::Hallway04
+                | Position::Hallway05
+                | Position::Hallway06
+                | Position::Hallway07
+                | Position::Hallway08
+                | Position::Hallway09
+                | Position::Hallway10
+        )
     }
 
-    fn is_immediately_outside_room(&self) -> bool {
-        match *self {
-            Position::Hallway02
-            | Position::Hallway04
-            | Position::Hallway06
-            | Position::Hallway08 => true,
-            _ => false,
-        }
+    fn is_immediately_outside_room(self) -> bool {
+        matches!(
+            self,
+            Position::Hallway02 | Position::Hallway04 | Position::Hallway06 | Position::Hallway08
+        )
     }
 }
 
@@ -97,8 +99,7 @@ fn get_adjacencies() -> HashSet<(Position, Position)> {
 }
 
 fn get_path(next_indices: &[[usize; POSITION_COUNT]], mut u: usize, v: usize) -> Vec<Position> {
-    let mut path = Vec::new();
-    path.push(FromPrimitive::from_usize(u).unwrap());
+    let mut path = vec![FromPrimitive::from_usize(u).unwrap()];
     while u != v {
         u = next_indices[u][v];
         path.push(FromPrimitive::from_usize(u).unwrap());
@@ -170,7 +171,7 @@ fn get_paths(adjacencies: &HashSet<(Position, Position)>) -> Vec<Vec<Position>> 
     paths
 }
 
-#[derive(Clone, Copy, FromPrimitive)]
+#[derive(Clone, Copy, Eq, FromPrimitive, PartialEq)]
 enum Amphipod {
     A1,
     A2,
@@ -182,84 +183,126 @@ enum Amphipod {
     D2,
 }
 
+impl Amphipod {
+    fn get_room(self) -> [Position; 2] {
+        match self {
+            Amphipod::A1 | Amphipod::A2 => ROOM_A,
+            Amphipod::B1 | Amphipod::B2 => ROOM_B,
+            Amphipod::C1 | Amphipod::C2 => ROOM_C,
+            Amphipod::D1 | Amphipod::D2 => ROOM_D,
+        }
+    }
+
+    fn get_siblings(self) -> [Amphipod; 2] {
+        match self {
+            Amphipod::A1 | Amphipod::A2 => [Amphipod::A1, Amphipod::A2],
+            Amphipod::B1 | Amphipod::B2 => [Amphipod::B1, Amphipod::B2],
+            Amphipod::C1 | Amphipod::C2 => [Amphipod::C1, Amphipod::C2],
+            Amphipod::D1 | Amphipod::D2 => [Amphipod::D1, Amphipod::D2],
+        }
+    }
+
+    fn get_step_cost(self) -> usize {
+        match self {
+            Amphipod::A1 | Amphipod::A2 => 1,
+            Amphipod::B1 | Amphipod::B2 => 10,
+            Amphipod::C1 | Amphipod::C2 => 100,
+            Amphipod::D1 | Amphipod::D2 => 1000,
+        }
+    }
+}
+
 const AMPHIPOD_COUNT: usize = Amphipod::D2 as usize + 1;
 
 type Configuration = [Position; AMPHIPOD_COUNT];
 type Cost = usize;
-type State = (Cost, Configuration);
 
-fn is_complete(configuration: &Configuration) -> bool {
-    match configuration[Amphipod::A1 as usize] {
-        Position::RoomANorth | Position::RoomASouth => (),
-        _ => return false,
-    };
-    match configuration[Amphipod::A2 as usize] {
-        Position::RoomANorth | Position::RoomASouth => (),
-        _ => return false,
-    };
-
-    match configuration[Amphipod::B1 as usize] {
-        Position::RoomBNorth | Position::RoomBSouth => (),
-        _ => return false,
-    };
-    match configuration[Amphipod::B2 as usize] {
-        Position::RoomBNorth | Position::RoomBSouth => (),
-        _ => return false,
-    };
-
-    match configuration[Amphipod::C1 as usize] {
-        Position::RoomCNorth | Position::RoomCSouth => (),
-        _ => return false,
-    };
-    match configuration[Amphipod::C2 as usize] {
-        Position::RoomCNorth | Position::RoomCSouth => (),
-        _ => return false,
-    };
-
-    match configuration[Amphipod::D1 as usize] {
-        Position::RoomDNorth | Position::RoomDSouth => (),
-        _ => return false,
-    };
-    match configuration[Amphipod::D2 as usize] {
-        Position::RoomDNorth | Position::RoomDSouth => (),
-        _ => return false,
-    };
-
-    true
+fn is_complete(configuration: Configuration) -> bool {
+    configuration.iter().enumerate().all(|(index, position)| {
+        let amphipod: Amphipod = FromPrimitive::from_usize(index).unwrap();
+        amphipod.get_room().contains(position)
+    })
 }
 
 fn is_valid_destination_for_amphipod(destination: Position, amphipod: Amphipod) -> bool {
-    match amphipod {
-        Amphipod::A1 | Amphipod::A2 => {
-            destination.is_in_hallway()
-                || [Position::RoomANorth, Position::RoomASouth].contains(&destination)
-        }
-        Amphipod::B1 | Amphipod::B2 => {
-            destination.is_in_hallway()
-                || [Position::RoomBNorth, Position::RoomBSouth].contains(&destination)
-        }
-        Amphipod::C1 | Amphipod::C2 => {
-            destination.is_in_hallway()
-                || [Position::RoomCNorth, Position::RoomCSouth].contains(&destination)
-        }
-        Amphipod::D1 | Amphipod::D2 => {
-            destination.is_in_hallway()
-                || [Position::RoomDNorth, Position::RoomDSouth].contains(&destination)
-        }
-    }
+    destination.is_in_hallway() || amphipod.get_room().contains(&destination)
 }
 
-fn get_step_cost(amphipod: Amphipod) -> usize {
-    match amphipod {
-        Amphipod::A1 | Amphipod::A2 => 1,
-        Amphipod::B1 | Amphipod::B2 => 10,
-        Amphipod::C1 | Amphipod::C2 => 100,
-        Amphipod::D1 | Amphipod::D2 => 1000,
-    }
+fn room_is_pure_for_amphipod(configuration: Configuration, amphipod: Amphipod) -> bool {
+    configuration
+        .iter()
+        .enumerate()
+        .filter(|(_index, position)| amphipod.get_room().contains(position))
+        .all(|(index, _position)| {
+            amphipod
+                .get_siblings()
+                .contains(&FromPrimitive::from_usize(index).unwrap())
+        })
 }
 
 fn get_path_cost(path: &[Position], amphipod: Amphipod) -> usize {
-    (path.len() - 1) * get_step_cost(amphipod)
+    (path.len() - 1) * amphipod.get_step_cost()
+}
+
+fn get_closest_destination_for_amphipod(amphipod: Amphipod) -> Position {
+    match amphipod {
+        Amphipod::A1 | Amphipod::A2 => Position::RoomANorth,
+        Amphipod::B1 | Amphipod::B2 => Position::RoomBNorth,
+        Amphipod::C1 | Amphipod::C2 => Position::RoomCNorth,
+        Amphipod::D1 | Amphipod::D2 => Position::RoomDNorth,
+    }
+}
+
+fn get_estimated_completion_cost(configuration: Configuration, paths: &[Vec<Position>]) -> usize {
+    configuration
+        .iter()
+        .enumerate()
+        .map(|(index, position)| {
+            let amphipod: Amphipod = FromPrimitive::from_usize(index).unwrap();
+            if is_valid_destination_for_amphipod(*position, amphipod) {
+                return 0;
+            }
+
+            let closest_destination = get_closest_destination_for_amphipod(amphipod);
+            get_path_cost(
+                paths
+                    .iter()
+                    .find(|path| {
+                        path[0] == *position && path[path.len() - 1] == closest_destination
+                    })
+                    .unwrap(),
+                amphipod,
+            )
+        })
+        .sum()
+}
+
+fn is_valid_configuration(configuration: Configuration) -> bool {
+    if configuration[Amphipod::A1 as usize..=Amphipod::A2 as usize].contains(&Position::RoomANorth)
+        && !configuration.contains(&Position::RoomASouth)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::B1 as usize..=Amphipod::B2 as usize].contains(&Position::RoomBNorth)
+        && !configuration.contains(&Position::RoomBSouth)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::C1 as usize..=Amphipod::C2 as usize].contains(&Position::RoomCNorth)
+        && !configuration.contains(&Position::RoomCSouth)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::D1 as usize..=Amphipod::D2 as usize].contains(&Position::RoomDNorth)
+        && !configuration.contains(&Position::RoomDSouth)
+    {
+        return false;
+    }
+
+    true
 }
 
 fn organize_amphipods(configuration: Configuration) -> Cost {
@@ -268,21 +311,24 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
     let paths = get_paths(&get_adjacencies());
 
     let mut queue = BinaryHeap::new();
-    queue.push(Reverse((0usize, configuration)));
-    while let Some(Reverse((cost, configuration))) = queue.pop() {
-        // println!("Evaluating cost {} {:?}", cost, configuration);
-
+    queue.push(Reverse((
+        get_estimated_completion_cost(configuration, &paths),
+        0usize,
+        configuration,
+    )));
+    while let Some(Reverse((_estimated_cost, actual_cost, configuration))) = queue.pop() {
         if visited.contains(&configuration) {
             continue;
         }
 
-        if cost > 13000 {
+        if actual_cost > 13000 {
+            println!("Breaking");
             break;
         }
 
-        if is_complete(&configuration) {
-            println!("Found {:?} for {}", configuration, cost);
-            return cost;
+        if is_complete(configuration) {
+            println!("Found {:?} for {}", configuration, actual_cost);
+            return actual_cost;
         }
 
         for path in paths.iter().filter(|path| {
@@ -304,18 +350,26 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
                 continue;
             }
 
-            let mut new_configuration = configuration.clone();
+            let mut new_configuration = configuration;
             new_configuration[amphipod as usize] = path[path.len() - 1];
 
-            // println!(
-            //     "Pushing {} {:?}",
-            //     cost + get_path_cost(path, amphipod),
-            //     new_configuration
-            // );
+            if !is_valid_configuration(new_configuration) {
+                continue;
+            }
+
+            if !destination.is_in_hallway()
+                && !room_is_pure_for_amphipod(new_configuration, amphipod)
+            {
+                continue;
+            }
+
+            let actual_cost = actual_cost + get_path_cost(path, amphipod);
+
             queue.push(Reverse((
-                cost + get_path_cost(path, amphipod),
+                actual_cost + get_estimated_completion_cost(new_configuration, &paths),
+                actual_cost,
                 new_configuration,
-            )))
+            )));
         }
 
         visited.insert(configuration);
