@@ -26,37 +26,80 @@ enum Position {
     Hallway08,
     Hallway09,
     Hallway10,
-    RoomANorth,
-    RoomASouth,
-    RoomBNorth,
-    RoomBSouth,
-    RoomCNorth,
-    RoomCSouth,
-    RoomDNorth,
-    RoomDSouth,
+    RoomA1,
+    RoomA2,
+    RoomA3,
+    RoomA4,
+    RoomB1,
+    RoomB2,
+    RoomB3,
+    RoomB4,
+    RoomC1,
+    RoomC2,
+    RoomC3,
+    RoomC4,
+    RoomD1,
+    RoomD2,
+    RoomD3,
+    RoomD4,
 }
 
-const ROOM_A: [Position; 2] = [Position::RoomANorth, Position::RoomASouth];
-const ROOM_B: [Position; 2] = [Position::RoomBNorth, Position::RoomBSouth];
-const ROOM_C: [Position; 2] = [Position::RoomCNorth, Position::RoomCSouth];
-const ROOM_D: [Position; 2] = [Position::RoomDNorth, Position::RoomDSouth];
+const ROOM_A: [Position; 4] = [
+    Position::RoomA1,
+    Position::RoomA2,
+    Position::RoomA3,
+    Position::RoomA4,
+];
+const ROOM_B: [Position; 4] = [
+    Position::RoomB1,
+    Position::RoomB2,
+    Position::RoomB3,
+    Position::RoomB4,
+];
+const ROOM_C: [Position; 4] = [
+    Position::RoomC1,
+    Position::RoomC2,
+    Position::RoomC3,
+    Position::RoomC4,
+];
+const ROOM_D: [Position; 4] = [
+    Position::RoomD1,
+    Position::RoomD2,
+    Position::RoomD3,
+    Position::RoomD4,
+];
 
 impl Position {
+    fn get_room(self) -> Option<[Position; 4]> {
+        if ROOM_A.contains(&self) {
+            Some(ROOM_A)
+        } else if ROOM_B.contains(&self) {
+            Some(ROOM_B)
+        } else if ROOM_C.contains(&self) {
+            Some(ROOM_C)
+        } else if ROOM_D.contains(&self) {
+            Some(ROOM_D)
+        } else {
+            None
+        }
+    }
+
     fn is_in_hallway(self) -> bool {
-        matches!(
-            self,
-            Position::Hallway00
-                | Position::Hallway01
-                | Position::Hallway02
-                | Position::Hallway03
-                | Position::Hallway04
-                | Position::Hallway05
-                | Position::Hallway06
-                | Position::Hallway07
-                | Position::Hallway08
-                | Position::Hallway09
-                | Position::Hallway10
-        )
+        // matches!(
+        //     self,
+        //     Position::Hallway00
+        //         | Position::Hallway01
+        //         | Position::Hallway02
+        //         | Position::Hallway03
+        //         | Position::Hallway04
+        //         | Position::Hallway05
+        //         | Position::Hallway06
+        //         | Position::Hallway07
+        //         | Position::Hallway08
+        //         | Position::Hallway09
+        //         | Position::Hallway10
+        // )
+        self as usize <= Position::Hallway10 as usize
     }
 
     fn is_immediately_outside_room(self) -> bool {
@@ -67,7 +110,7 @@ impl Position {
     }
 }
 
-const POSITION_COUNT: usize = Position::RoomDSouth as usize + 1;
+const POSITION_COUNT: usize = Position::RoomD4 as usize + 1;
 
 fn get_adjacencies() -> HashSet<(Position, Position)> {
     let mut adjacencies = HashSet::new();
@@ -82,14 +125,22 @@ fn get_adjacencies() -> HashSet<(Position, Position)> {
         (Position::Hallway07, Position::Hallway08),
         (Position::Hallway08, Position::Hallway09),
         (Position::Hallway09, Position::Hallway10),
-        (Position::Hallway02, Position::RoomANorth),
-        (Position::RoomANorth, Position::RoomASouth),
-        (Position::Hallway04, Position::RoomBNorth),
-        (Position::RoomBNorth, Position::RoomBSouth),
-        (Position::Hallway06, Position::RoomCNorth),
-        (Position::RoomCNorth, Position::RoomCSouth),
-        (Position::Hallway08, Position::RoomDNorth),
-        (Position::RoomDNorth, Position::RoomDSouth),
+        (Position::Hallway02, Position::RoomA1),
+        (Position::RoomA1, Position::RoomA2),
+        (Position::RoomA2, Position::RoomA3),
+        (Position::RoomA3, Position::RoomA4),
+        (Position::Hallway04, Position::RoomB1),
+        (Position::RoomB1, Position::RoomB2),
+        (Position::RoomB2, Position::RoomB3),
+        (Position::RoomB3, Position::RoomB4),
+        (Position::Hallway06, Position::RoomC1),
+        (Position::RoomC1, Position::RoomC2),
+        (Position::RoomC2, Position::RoomC3),
+        (Position::RoomC3, Position::RoomC4),
+        (Position::Hallway08, Position::RoomD1),
+        (Position::RoomD1, Position::RoomD2),
+        (Position::RoomD2, Position::RoomD3),
+        (Position::RoomD3, Position::RoomD4),
     ] {
         adjacencies.insert((a, b));
         adjacencies.insert((b, a));
@@ -164,9 +215,18 @@ fn get_paths(adjacencies: &HashSet<(Position, Position)>) -> Vec<Vec<Position>> 
                 continue;
             }
 
+            // If we start in a room, we must leave that room
+            if !from_position.is_in_hallway()
+                && from_position.get_room().unwrap().contains(&to_position)
+            {
+                continue;
+            }
+
             paths.push(get_path(&next_indices, from, to));
         }
     }
+
+    println!("Generated {} paths", paths.len());
 
     paths
 }
@@ -175,44 +235,60 @@ fn get_paths(adjacencies: &HashSet<(Position, Position)>) -> Vec<Vec<Position>> 
 enum Amphipod {
     A1,
     A2,
+    A3,
+    A4,
     B1,
     B2,
+    B3,
+    B4,
     C1,
     C2,
+    C3,
+    C4,
     D1,
     D2,
+    D3,
+    D4,
 }
 
 impl Amphipod {
-    fn get_room(self) -> [Position; 2] {
+    fn get_room(self) -> [Position; 4] {
         match self {
-            Amphipod::A1 | Amphipod::A2 => ROOM_A,
-            Amphipod::B1 | Amphipod::B2 => ROOM_B,
-            Amphipod::C1 | Amphipod::C2 => ROOM_C,
-            Amphipod::D1 | Amphipod::D2 => ROOM_D,
+            Amphipod::A1 | Amphipod::A2 | Amphipod::A3 | Amphipod::A4 => ROOM_A,
+            Amphipod::B1 | Amphipod::B2 | Amphipod::B3 | Amphipod::B4 => ROOM_B,
+            Amphipod::C1 | Amphipod::C2 | Amphipod::C3 | Amphipod::C4 => ROOM_C,
+            Amphipod::D1 | Amphipod::D2 | Amphipod::D3 | Amphipod::D4 => ROOM_D,
         }
     }
 
-    fn get_siblings(self) -> [Amphipod; 2] {
+    fn get_siblings(self) -> [Amphipod; 4] {
         match self {
-            Amphipod::A1 | Amphipod::A2 => [Amphipod::A1, Amphipod::A2],
-            Amphipod::B1 | Amphipod::B2 => [Amphipod::B1, Amphipod::B2],
-            Amphipod::C1 | Amphipod::C2 => [Amphipod::C1, Amphipod::C2],
-            Amphipod::D1 | Amphipod::D2 => [Amphipod::D1, Amphipod::D2],
+            Amphipod::A1 | Amphipod::A2 | Amphipod::A3 | Amphipod::A4 => {
+                [Amphipod::A1, Amphipod::A2, Amphipod::A3, Amphipod::A4]
+            }
+            Amphipod::B1 | Amphipod::B2 | Amphipod::B3 | Amphipod::B4 => {
+                [Amphipod::B1, Amphipod::B2, Amphipod::B3, Amphipod::B4]
+            }
+            Amphipod::C1 | Amphipod::C2 | Amphipod::C3 | Amphipod::C4 => {
+                [Amphipod::C1, Amphipod::C2, Amphipod::C3, Amphipod::C4]
+            }
+            Amphipod::D1 | Amphipod::D2 | Amphipod::D3 | Amphipod::D4 => {
+                [Amphipod::D1, Amphipod::D2, Amphipod::D3, Amphipod::D4]
+            }
         }
     }
 
     fn get_step_cost(self) -> usize {
         match self {
-            Amphipod::A1 | Amphipod::A2 => 1,
-            Amphipod::B1 | Amphipod::B2 => 10,
-            Amphipod::C1 | Amphipod::C2 => 100,
-            Amphipod::D1 | Amphipod::D2 => 1000,
+            Amphipod::A1 | Amphipod::A2 | Amphipod::A3 | Amphipod::A4 => 1,
+            Amphipod::B1 | Amphipod::B2 | Amphipod::B3 | Amphipod::B4 => 10,
+            Amphipod::C1 | Amphipod::C2 | Amphipod::C3 | Amphipod::C4 => 100,
+            Amphipod::D1 | Amphipod::D2 | Amphipod::D3 | Amphipod::D4 => 1000,
         }
     }
 }
 
-const AMPHIPOD_COUNT: usize = Amphipod::D2 as usize + 1;
+const AMPHIPOD_COUNT: usize = Amphipod::D4 as usize + 1;
 
 type Configuration = [Position; AMPHIPOD_COUNT];
 type Cost = usize;
@@ -246,10 +322,10 @@ fn get_path_cost(path: &[Position], amphipod: Amphipod) -> usize {
 
 fn get_closest_destination_for_amphipod(amphipod: Amphipod) -> Position {
     match amphipod {
-        Amphipod::A1 | Amphipod::A2 => Position::RoomANorth,
-        Amphipod::B1 | Amphipod::B2 => Position::RoomBNorth,
-        Amphipod::C1 | Amphipod::C2 => Position::RoomCNorth,
-        Amphipod::D1 | Amphipod::D2 => Position::RoomDNorth,
+        Amphipod::A1 | Amphipod::A2 | Amphipod::A3 | Amphipod::A4 => Position::RoomA1,
+        Amphipod::B1 | Amphipod::B2 | Amphipod::B3 | Amphipod::B4 => Position::RoomB1,
+        Amphipod::C1 | Amphipod::C2 | Amphipod::C3 | Amphipod::C4 => Position::RoomC1,
+        Amphipod::D1 | Amphipod::D2 | Amphipod::D3 | Amphipod::D4 => Position::RoomD1,
     }
 }
 
@@ -259,7 +335,7 @@ fn get_estimated_completion_cost(configuration: Configuration, paths: &[Vec<Posi
         .enumerate()
         .map(|(index, position)| {
             let amphipod: Amphipod = FromPrimitive::from_usize(index).unwrap();
-            if is_valid_destination_for_amphipod(*position, amphipod) {
+            if !position.is_in_hallway() && is_valid_destination_for_amphipod(*position, amphipod) {
                 return 0;
             }
 
@@ -278,26 +354,86 @@ fn get_estimated_completion_cost(configuration: Configuration, paths: &[Vec<Posi
 }
 
 fn is_valid_configuration(configuration: Configuration) -> bool {
-    if configuration[Amphipod::A1 as usize..=Amphipod::A2 as usize].contains(&Position::RoomANorth)
-        && !configuration.contains(&Position::RoomASouth)
+    if configuration[Amphipod::A1 as usize..=Amphipod::A4 as usize].contains(&Position::RoomA1)
+        && !configuration.contains(&Position::RoomA2)
+        && !configuration.contains(&Position::RoomA3)
+        && !configuration.contains(&Position::RoomA4)
     {
         return false;
     }
 
-    if configuration[Amphipod::B1 as usize..=Amphipod::B2 as usize].contains(&Position::RoomBNorth)
-        && !configuration.contains(&Position::RoomBSouth)
+    if configuration[Amphipod::A1 as usize..=Amphipod::A4 as usize].contains(&Position::RoomA2)
+        && !configuration.contains(&Position::RoomA3)
+        && !configuration.contains(&Position::RoomA4)
     {
         return false;
     }
 
-    if configuration[Amphipod::C1 as usize..=Amphipod::C2 as usize].contains(&Position::RoomCNorth)
-        && !configuration.contains(&Position::RoomCSouth)
+    if configuration[Amphipod::A1 as usize..=Amphipod::A4 as usize].contains(&Position::RoomA3)
+        && !configuration.contains(&Position::RoomA4)
     {
         return false;
     }
 
-    if configuration[Amphipod::D1 as usize..=Amphipod::D2 as usize].contains(&Position::RoomDNorth)
-        && !configuration.contains(&Position::RoomDSouth)
+    if configuration[Amphipod::B1 as usize..=Amphipod::B4 as usize].contains(&Position::RoomB1)
+        && !configuration.contains(&Position::RoomB2)
+        && !configuration.contains(&Position::RoomB3)
+        && !configuration.contains(&Position::RoomB4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::B1 as usize..=Amphipod::B4 as usize].contains(&Position::RoomB2)
+        && !configuration.contains(&Position::RoomB3)
+        && !configuration.contains(&Position::RoomB4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::B1 as usize..=Amphipod::B4 as usize].contains(&Position::RoomB3)
+        && !configuration.contains(&Position::RoomB4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::C1 as usize..=Amphipod::C4 as usize].contains(&Position::RoomC1)
+        && !configuration.contains(&Position::RoomC2)
+        && !configuration.contains(&Position::RoomC3)
+        && !configuration.contains(&Position::RoomC4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::C1 as usize..=Amphipod::C4 as usize].contains(&Position::RoomC2)
+        && !configuration.contains(&Position::RoomC3)
+        && !configuration.contains(&Position::RoomC4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::C1 as usize..=Amphipod::C4 as usize].contains(&Position::RoomC3)
+        && !configuration.contains(&Position::RoomC4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::D1 as usize..=Amphipod::D4 as usize].contains(&Position::RoomD1)
+        && !configuration.contains(&Position::RoomD2)
+        && !configuration.contains(&Position::RoomD3)
+        && !configuration.contains(&Position::RoomD4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::D1 as usize..=Amphipod::D4 as usize].contains(&Position::RoomD2)
+        && !configuration.contains(&Position::RoomD3)
+        && !configuration.contains(&Position::RoomD4)
+    {
+        return false;
+    }
+
+    if configuration[Amphipod::D1 as usize..=Amphipod::D4 as usize].contains(&Position::RoomD3)
+        && !configuration.contains(&Position::RoomD4)
     {
         return false;
     }
@@ -305,10 +441,45 @@ fn is_valid_configuration(configuration: Configuration) -> bool {
     true
 }
 
+fn position_is_complete(configuration: Configuration, position: Position) -> bool {
+    let a_positions = &configuration[Amphipod::A1 as usize..=Amphipod::A4 as usize];
+    let b_positions = &configuration[Amphipod::B1 as usize..=Amphipod::B4 as usize];
+    let c_positions = &configuration[Amphipod::C1 as usize..=Amphipod::C4 as usize];
+    let d_positions = &configuration[Amphipod::D1 as usize..=Amphipod::D4 as usize];
+
+    match position {
+        Position::RoomA1 => ROOM_A.iter().all(|p| a_positions.contains(p)),
+        Position::RoomA2 => ROOM_A[1..].iter().all(|p| a_positions.contains(p)),
+        Position::RoomA3 => ROOM_A[2..].iter().all(|p| a_positions.contains(p)),
+        Position::RoomA4 => ROOM_A[3..].iter().all(|p| a_positions.contains(p)),
+        Position::RoomB1 => ROOM_B.iter().all(|p| b_positions.contains(p)),
+        Position::RoomB2 => ROOM_B[1..].iter().all(|p| b_positions.contains(p)),
+        Position::RoomB3 => ROOM_B[2..].iter().all(|p| b_positions.contains(p)),
+        Position::RoomB4 => ROOM_B[3..].iter().all(|p| b_positions.contains(p)),
+        Position::RoomC1 => ROOM_C.iter().all(|p| c_positions.contains(p)),
+        Position::RoomC2 => ROOM_C[1..].iter().all(|p| c_positions.contains(p)),
+        Position::RoomC3 => ROOM_C[2..].iter().all(|p| c_positions.contains(p)),
+        Position::RoomC4 => ROOM_C[3..].iter().all(|p| c_positions.contains(p)),
+        Position::RoomD1 => ROOM_D.iter().all(|p| d_positions.contains(p)),
+        Position::RoomD2 => ROOM_D[1..].iter().all(|p| d_positions.contains(p)),
+        Position::RoomD3 => ROOM_D[2..].iter().all(|p| d_positions.contains(p)),
+        Position::RoomD4 => ROOM_D[3..].iter().all(|p| d_positions.contains(p)),
+        _ => false,
+    }
+}
+
 fn organize_amphipods(configuration: Configuration) -> Cost {
     let mut visited = HashSet::new();
 
     let paths = get_paths(&get_adjacencies());
+
+    let mut popped = 0usize;
+    let mut skipped_because_visited = 0usize;
+    let mut paths_visited = 0usize;
+    let mut skipped_because_of_invalid_destination = 0usize;
+    let mut skipped_because_of_invalid_configuration = 0usize;
+    let mut skipped_because_of_impure_room = 0usize;
+    let mut max_cost = 0;
 
     let mut queue = BinaryHeap::new();
     queue.push(Reverse((
@@ -317,18 +488,29 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
         configuration,
     )));
     while let Some(Reverse((_estimated_cost, actual_cost, configuration))) = queue.pop() {
+        popped += 1;
         if visited.contains(&configuration) {
+            skipped_because_visited += 1;
             continue;
-        }
-
-        if actual_cost > 13000 {
-            println!("Breaking");
-            break;
         }
 
         if is_complete(configuration) {
             println!("Found {:?} for {}", configuration, actual_cost);
             return actual_cost;
+        }
+
+        if _estimated_cost > max_cost {
+            // println!(
+            //     "max {} popped {} visited {} paths {} dest {} config {} impure {}",
+            //     _estimated_cost,
+            //     popped,
+            //     skipped_because_visited,
+            //     paths_visited,
+            //     skipped_because_of_invalid_destination,
+            //     skipped_because_of_invalid_configuration,
+            //     skipped_because_of_impure_room
+            // );
+            max_cost = _estimated_cost;
         }
 
         for path in paths.iter().filter(|path| {
@@ -337,6 +519,12 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
                     .iter()
                     .all(|position| !configuration.contains(position))
         }) {
+            paths_visited += 1;
+
+            if position_is_complete(configuration, path[0]) {
+                continue;
+            }
+
             let amphipod: Amphipod = FromPrimitive::from_usize(
                 configuration
                     .iter()
@@ -347,19 +535,26 @@ fn organize_amphipods(configuration: Configuration) -> Cost {
 
             let destination = path[path.len() - 1];
             if !is_valid_destination_for_amphipod(destination, amphipod) {
+                skipped_because_of_invalid_destination += 1;
                 continue;
             }
 
             let mut new_configuration = configuration;
             new_configuration[amphipod as usize] = path[path.len() - 1];
 
+            if visited.contains(&new_configuration) {
+                continue;
+            }
+
             if !is_valid_configuration(new_configuration) {
+                skipped_because_of_invalid_configuration += 1;
                 continue;
             }
 
             if !destination.is_in_hallway()
                 && !room_is_pure_for_amphipod(new_configuration, amphipod)
             {
+                skipped_because_of_impure_room += 1;
                 continue;
             }
 
@@ -391,15 +586,51 @@ fn main() {
     //     Position::RoomBSouth,
     //     Position::RoomDNorth,
     // ]);
+    // organize_amphipods([
+    //     Position::RoomANorth,
+    //     Position::RoomCSouth,
+    //     Position::RoomASouth,
+    //     Position::RoomCNorth,
+    //     Position::RoomBSouth,
+    //     Position::RoomDSouth,
+    //     Position::RoomBNorth,
+    //     Position::RoomDNorth,
+    // ]);
+    // organize_amphipods([
+    //     Position::RoomD2,
+    //     Position::RoomC3,
+    //     Position::RoomA4,
+    //     Position::RoomD4,
+    //     Position::RoomA1,
+    //     Position::RoomC1,
+    //     Position::RoomC2,
+    //     Position::RoomB3,
+    //     Position::RoomB1,
+    //     Position::RoomB2,
+    //     Position::RoomD3,
+    //     Position::RoomC4,
+    //     Position::RoomD1,
+    //     Position::RoomA2,
+    //     Position::RoomA3,
+    //     Position::RoomB4,
+    // ]);
     organize_amphipods([
-        Position::RoomANorth,
-        Position::RoomCSouth,
-        Position::RoomASouth,
-        Position::RoomCNorth,
-        Position::RoomBSouth,
-        Position::RoomDSouth,
-        Position::RoomBNorth,
-        Position::RoomDNorth,
+        Position::RoomA1,
+        Position::RoomC4,
+        Position::RoomD2,
+        Position::RoomC3,
+        Position::RoomA4,
+        Position::RoomC1,
+        Position::RoomC2,
+        Position::RoomB3,
+        Position::RoomB4,
+        Position::RoomD4,
+        Position::RoomB2,
+        Position::RoomD3,
+        Position::RoomB1,
+        Position::RoomD1,
+        Position::RoomA2,
+        Position::RoomA3,
     ]);
 }
 
