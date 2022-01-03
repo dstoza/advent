@@ -19,19 +19,17 @@ use itertools::join;
 enum Expression {
     Literal(i32),
     Input(usize),
-    Sum(Vec<Box<Expression>>),
+    Sum(Vec<Expression>),
 }
 
 impl Expression {
-    fn new_literal(value: i32) -> Box<Self> {
-        Box::new(Expression::Literal(value))
+    fn new_literal(value: i32) -> Self {
+        Expression::Literal(value)
     }
 
-    fn new_input() -> Box<Self> {
+    fn new_input() -> Self {
         static NEXT_INPUT: AtomicUsize = AtomicUsize::new(1);
-        Box::new(Expression::Input(
-            NEXT_INPUT.fetch_add(1, Ordering::Relaxed),
-        ))
+        Expression::Input(NEXT_INPUT.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -40,33 +38,27 @@ impl AddAssign for Expression {
         match self {
             Expression::Literal(value) => match rhs {
                 Expression::Literal(other_value) => {
-                    *self = Expression::Literal(*value + other_value)
+                    *self = Expression::Literal(*value + other_value);
                 }
                 _ => unimplemented!(),
             },
             Expression::Input(index) => match rhs {
                 Expression::Literal(value) => {
                     *self = Expression::Sum(vec![
-                        Box::new(Expression::Input(*index)),
+                        Expression::Input(*index),
                         Expression::new_literal(value),
-                    ])
+                    ]);
                 }
                 _ => unimplemented!(),
             },
             Expression::Sum(values) => {
                 let constant = values
                     .iter_mut()
-                    .find(|expression| {
-                        if let Expression::Literal(_) = ***expression {
-                            true
-                        } else {
-                            false
-                        }
-                    })
+                    .find(|expression| matches!(**expression, Expression::Literal(_)))
                     .unwrap();
 
                 if let Expression::Literal(other_value) = rhs {
-                    if let Expression::Literal(value) = &mut **constant {
+                    if let Expression::Literal(value) = &mut *constant {
                         *value += other_value;
                     } else {
                         unimplemented!()
@@ -105,7 +97,7 @@ impl PartialEq for Expression {
                         unimplemented!()
                     }
                 }
-                _ => unimplemented!(),
+                Expression::Sum(_) => unimplemented!(),
             },
             Expression::Input(_) => {
                 if let Expression::Input(_) = other {
@@ -122,7 +114,7 @@ impl PartialEq for Expression {
     }
 }
 
-type Register = VecDeque<Box<Expression>>;
+type Register = VecDeque<Expression>;
 
 #[derive(Clone)]
 struct RegisterFile {
@@ -132,7 +124,7 @@ struct RegisterFile {
     w: Register,
 }
 
-fn set_register(value: Box<Expression>) -> Register {
+fn set_register(value: Expression) -> Register {
     VecDeque::from([value])
 }
 
@@ -155,72 +147,49 @@ impl RegisterFile {
         }
     }
 
-    fn set(&mut self, name: RegisterName, value: Box<Expression>) {
+    fn get_mut(&mut self, name: RegisterName) -> &mut Register {
         match name {
-            RegisterName::X => self.x = set_register(value),
-            RegisterName::Y => self.y = set_register(value),
-            RegisterName::Z => self.z = set_register(value),
-            RegisterName::W => self.w = set_register(value),
-        }
-    }
-
-    fn set_all(&mut self, name: RegisterName, values: VecDeque<Box<Expression>>) {
-        match name {
-            RegisterName::X => self.x = values,
-            RegisterName::Y => self.y = values,
-            RegisterName::Z => self.z = values,
-            RegisterName::W => self.w = values,
-        }
-    }
-
-    fn add(&mut self, name: RegisterName, value: Box<Expression>) {
-        let register = match name {
             RegisterName::X => &mut self.x,
             RegisterName::Y => &mut self.y,
             RegisterName::Z => &mut self.z,
             RegisterName::W => &mut self.w,
-        };
+        }
+    }
 
-        if let Expression::Literal(0) = *value {
+    fn set(&mut self, name: RegisterName, value: Expression) {
+        *self.get_mut(name) = set_register(value);
+    }
+
+    fn set_all(&mut self, name: RegisterName, values: Register) {
+        *self.get_mut(name) = values;
+    }
+
+    fn add(&mut self, name: RegisterName, value: Expression) {
+        let register = self.get_mut(name);
+
+        if let Expression::Literal(0) = value {
             return;
         }
 
         if register.len() == 1 {
-            *register[0] += *value
+            register[0] += value;
+        } else if let Expression::Literal(0) = register[0] {
+            register[0] = value;
         } else {
-            if let Expression::Literal(0) = *register[0] {
-                *register[0] = *value
-            } else {
-                unimplemented!()
-            }
+            unimplemented!()
         }
     }
 
     fn mask(&mut self, name: RegisterName) {
-        match name {
-            RegisterName::X => self.x.resize(1, Expression::new_literal(1234)),
-            RegisterName::Y => self.y.resize(1, Expression::new_literal(1234)),
-            RegisterName::Z => self.z.resize(1, Expression::new_literal(1234)),
-            RegisterName::W => self.w.resize(1, Expression::new_literal(1234)),
-        }
+        self.get_mut(name).resize(1, Expression::new_literal(1234));
     }
 
     fn shift_up(&mut self, name: RegisterName) {
-        match name {
-            RegisterName::X => self.x.push_front(Expression::new_literal(0)),
-            RegisterName::Y => self.y.push_front(Expression::new_literal(0)),
-            RegisterName::Z => self.z.push_front(Expression::new_literal(0)),
-            RegisterName::W => self.w.push_front(Expression::new_literal(0)),
-        }
+        self.get_mut(name).push_front(Expression::new_literal(0));
     }
 
     fn shift_down(&mut self, name: RegisterName) {
-        match name {
-            RegisterName::X => self.x.pop_front(),
-            RegisterName::Y => self.y.pop_front(),
-            RegisterName::Z => self.z.pop_front(),
-            RegisterName::W => self.w.pop_front(),
-        };
+        self.get_mut(name).pop_front();
     }
 }
 
@@ -264,7 +233,7 @@ impl Debug for RegisterName {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum ConstraintKind {
     Equal,
     NotEqual,
@@ -286,16 +255,12 @@ impl Debug for ConstraintKind {
 #[derive(Clone)]
 struct Constraint {
     kind: ConstraintKind,
-    lhs: VecDeque<Box<Expression>>,
-    rhs: VecDeque<Box<Expression>>,
+    lhs: Register,
+    rhs: Register,
 }
 
 impl Constraint {
-    fn new(
-        kind: ConstraintKind,
-        lhs: VecDeque<Box<Expression>>,
-        rhs: VecDeque<Box<Expression>>,
-    ) -> Self {
+    fn new(kind: ConstraintKind, lhs: Register, rhs: Register) -> Self {
         Self { kind, lhs, rhs }
     }
 }
@@ -376,6 +341,155 @@ impl Instruction {
             .collect()
     }
 
+    fn execute_add(
+        register_file: &mut RegisterFile,
+        destination: RegisterName,
+        source: &Source,
+    ) -> bool {
+        let destination_value = register_file.get(destination);
+        if destination_value.len() == 1 && destination_value[0] == Expression::Literal(0) {
+            match source {
+                Source::Register(name) => {
+                    register_file.set_all(destination, register_file.get(*name).clone());
+                }
+                Source::Literal(value) => {
+                    register_file.set(destination, Expression::new_literal(*value));
+                }
+            }
+        } else {
+            match source {
+                Source::Register(name) => {
+                    let source_value = register_file.get(*name);
+                    let source_value = if source_value.len() == 1 {
+                        source_value[0].clone()
+                    } else {
+                        unimplemented!()
+                    };
+
+                    register_file.add(destination, source_value);
+                }
+                Source::Literal(value) => {
+                    register_file.add(destination, Expression::new_literal(*value));
+                }
+            }
+        }
+        true
+    }
+
+    fn execute_mul(
+        register_file: &mut RegisterFile,
+        destination: RegisterName,
+        source: &Source,
+    ) -> bool {
+        match source {
+            Source::Literal(0) => {
+                register_file.set(destination, Expression::new_literal(0));
+            }
+            Source::Register(name) => {
+                let destination_value = register_file.get(destination);
+                let source_value = register_file.get(*name);
+                if source_value.len() == 1 && source_value[0] == Expression::new_literal(1)
+                    || destination_value.len() == 1
+                        && destination_value[0] == Expression::new_literal(0)
+                {
+                    // Nothing happens
+                } else if source_value.len() == 1 && source_value[0] == Expression::new_literal(26)
+                {
+                    register_file.shift_up(destination);
+                } else if source_value.len() == 1 && source_value[0] == Expression::new_literal(0) {
+                    register_file.set(destination, Expression::new_literal(0));
+                } else {
+                    unimplemented!()
+                }
+            }
+            Source::Literal(_) => unimplemented!(),
+        }
+        true
+    }
+
+    fn execute_eql(
+        register_file: &mut RegisterFile,
+        constraints: &[Constraint],
+        remainder: &[Instruction],
+        destination: RegisterName,
+        source: &Source,
+    ) -> bool {
+        match source {
+            Source::Register(name) => {
+                let destination_value = register_file.get(destination);
+                let source_value = register_file.get(*name);
+                if destination_value.len() == 1 {
+                    match &destination_value[0] {
+                        Expression::Input(_) | Expression::Literal(_) => {
+                            let equal = destination_value == source_value;
+                            register_file.set(destination, Expression::new_literal(equal as i32));
+                        }
+                        Expression::Sum(values) => {
+                            let literal_sum: i32 = values
+                                .iter()
+                                .filter_map(|expression| {
+                                    if let Expression::Literal(value) = *expression {
+                                        Some(value)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .sum();
+                            if source_value.len() == 1 {
+                                if let Expression::Input(_) = source_value[0] {
+                                    if literal_sum > 9 {
+                                        register_file.set(destination, Expression::new_literal(0));
+                                    } else {
+                                        // Split the universe
+                                        for kind in
+                                            [ConstraintKind::Equal, ConstraintKind::NotEqual]
+                                        {
+                                            let constraint = Constraint::new(
+                                                kind,
+                                                destination_value.clone(),
+                                                source_value.clone(),
+                                            );
+                                            let constraints: Vec<Constraint> = constraints
+                                                .iter()
+                                                .cloned()
+                                                .chain([constraint])
+                                                .collect();
+                                            let mut equal_register_file = register_file.clone();
+                                            let value = match kind {
+                                                ConstraintKind::Equal => 1,
+                                                ConstraintKind::NotEqual => 0,
+                                            };
+                                            equal_register_file
+                                                .set(destination, Expression::new_literal(value));
+                                            execute(equal_register_file, &constraints, remainder);
+                                        }
+
+                                        return false;
+                                    }
+                                } else {
+                                    unimplemented!()
+                                }
+                            } else {
+                                unimplemented!()
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            Source::Literal(value) => {
+                let destination_value = register_file.get(destination);
+                if destination_value.len() == 1 {
+                    let equal = destination_value[0] == Expression::new_literal(*value);
+                    register_file.set(destination, Expression::new_literal(equal as i32));
+                } else {
+                    unimplemented!()
+                }
+                true
+            }
+        }
+    }
+
     fn execute(
         &self,
         register_file: &mut RegisterFile,
@@ -385,170 +499,38 @@ impl Instruction {
         match self {
             Instruction::Inp(destination) => {
                 register_file.set(*destination, Expression::new_input());
+                true
             }
             Instruction::Add(destination, source) => {
-                let destination_value = register_file.get(*destination);
-                if destination_value.len() == 1 && *destination_value[0] == Expression::Literal(0) {
-                    match source {
-                        Source::Register(name) => {
-                            register_file.set_all(*destination, register_file.get(*name).clone())
-                        }
-                        Source::Literal(value) => {
-                            register_file.set(*destination, Expression::new_literal(*value))
-                        }
-                    }
-                } else {
-                    match source {
-                        Source::Register(name) => {
-                            let source_value = register_file.get(*name);
-                            let source_value = if source_value.len() == 1 {
-                                source_value[0].clone()
-                            } else {
-                                unimplemented!()
-                            };
-
-                            register_file.add(*destination, source_value.clone());
-                        }
-                        Source::Literal(value) => {
-                            register_file.add(*destination, Expression::new_literal(*value))
-                        }
-                    }
-                }
+                Instruction::execute_add(register_file, *destination, source)
             }
             Instruction::Mul(destination, source) => {
+                Instruction::execute_mul(register_file, *destination, source)
+            }
+            Instruction::Div(destination, source) => {
                 match source {
-                    Source::Literal(0) => {
-                        register_file.set(*destination, Expression::new_literal(0))
-                    }
-                    Source::Register(name) => {
-                        let destination_value = register_file.get(*destination);
-                        let source_value = register_file.get(*name);
-                        if source_value.len() == 1 && source_value[0] == Expression::new_literal(1)
-                        {
-                            // Nothing happens
-                        } else if destination_value.len() == 1
-                            && destination_value[0] == Expression::new_literal(0)
-                        {
-                            // Nothing happens
-                        } else if source_value.len() == 1
-                            && source_value[0] == Expression::new_literal(26)
-                        {
-                            register_file.shift_up(*destination)
-                        } else if source_value.len() == 1
-                            && source_value[0] == Expression::new_literal(0)
-                        {
-                            register_file.set(*destination, Expression::new_literal(0))
-                        } else {
-                            unimplemented!()
-                        }
-                    }
+                    Source::Literal(1) => {}
+                    Source::Literal(26) => register_file.shift_down(*destination),
                     _ => unimplemented!(),
                 }
+                true
             }
-            Instruction::Div(destination, source) => match source {
-                Source::Literal(1) => {}
-                Source::Literal(26) => register_file.shift_down(*destination),
-                _ => unimplemented!(),
-            },
             Instruction::Mod(destination, source) => {
                 if let Source::Literal(26) = source {
-                    register_file.mask(*destination)
+                    register_file.mask(*destination);
                 } else {
                     unimplemented!()
                 }
+                true
             }
-            Instruction::Eql(destination, source) => match source {
-                Source::Register(name) => {
-                    let destination_value = register_file.get(*destination);
-                    let source_value = register_file.get(*name);
-                    if destination_value.len() == 1 {
-                        match &*destination_value[0] {
-                            Expression::Input(_) | Expression::Literal(_) => {
-                                let equal = destination_value == source_value;
-                                register_file
-                                    .set(*destination, Expression::new_literal(equal as i32))
-                            }
-                            Expression::Sum(values) => {
-                                let literal_sum: i32 = values
-                                    .iter()
-                                    .filter_map(|expression| {
-                                        if let Expression::Literal(value) = **expression {
-                                            Some(value)
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .sum();
-                                if source_value.len() == 1 {
-                                    if let Expression::Input(_) = *source_value[0] {
-                                        if literal_sum > 9 {
-                                            register_file
-                                                .set(*destination, Expression::new_literal(0))
-                                        } else {
-                                            // Split the universe
-                                            let equal_constraint = Constraint::new(
-                                                ConstraintKind::Equal,
-                                                destination_value.clone(),
-                                                source_value.clone(),
-                                            );
-                                            let equal_constraints: Vec<Constraint> = constraints
-                                                .iter()
-                                                .cloned()
-                                                .chain([equal_constraint])
-                                                .collect();
-                                            let mut equal_register_file = register_file.clone();
-                                            equal_register_file
-                                                .set(*destination, Expression::new_literal(1));
-                                            execute(
-                                                equal_register_file,
-                                                equal_constraints,
-                                                remainder,
-                                            );
-
-                                            let not_equal_constraint = Constraint::new(
-                                                ConstraintKind::NotEqual,
-                                                destination_value.clone(),
-                                                source_value.clone(),
-                                            );
-                                            let not_equal_constraints: Vec<Constraint> =
-                                                constraints
-                                                    .iter()
-                                                    .cloned()
-                                                    .chain([not_equal_constraint])
-                                                    .collect();
-                                            let mut not_equal_register_file = register_file.clone();
-                                            not_equal_register_file
-                                                .set(*destination, Expression::new_literal(0));
-                                            execute(
-                                                not_equal_register_file,
-                                                not_equal_constraints,
-                                                remainder,
-                                            );
-
-                                            return false;
-                                        }
-                                    } else {
-                                        unimplemented!()
-                                    }
-                                } else {
-                                    unimplemented!()
-                                }
-                            }
-                        }
-                    }
-                }
-                Source::Literal(value) => {
-                    let destination_value = register_file.get(*destination);
-                    if destination_value.len() == 1 {
-                        let equal = destination_value[0] == Expression::new_literal(*value);
-                        register_file.set(*destination, Expression::new_literal(equal as i32))
-                    } else {
-                        unimplemented!()
-                    }
-                }
-            },
+            Instruction::Eql(destination, source) => Instruction::execute_eql(
+                register_file,
+                constraints,
+                remainder,
+                *destination,
+                source,
+            ),
         }
-        true
     }
 }
 
@@ -577,12 +559,12 @@ impl Debug for Instruction {
 
 fn execute(
     mut register_file: RegisterFile,
-    constraints: Vec<Constraint>,
+    constraints: &[Constraint],
     instructions: &[Instruction],
 ) {
     for (index, instruction) in instructions.iter().enumerate() {
         // println!("{} {:?}", index, instruction);
-        if !instruction.execute(&mut register_file, &constraints, &instructions[index + 1..]) {
+        if !instruction.execute(&mut register_file, constraints, &instructions[index + 1..]) {
             return;
         }
         // println!("{:?} {:?}", constraints, register_file);
@@ -593,8 +575,9 @@ fn execute(
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-    let instructions = Instruction::parse_from_lines(reader.lines().map(|line| line.unwrap()));
-    execute(RegisterFile::new(), Vec::new(), &instructions);
+    let instructions =
+        Instruction::parse_from_lines(reader.lines().map(std::result::Result::unwrap));
+    execute(RegisterFile::new(), &Vec::new(), &instructions);
 }
 
 #[cfg(test)]
