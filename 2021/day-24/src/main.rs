@@ -20,7 +20,6 @@ enum Expression {
     Literal(i32),
     Input(usize),
     Sum(Vec<Box<Expression>>),
-    Product(Box<Expression>, Box<Expression>),
 }
 
 impl Expression {
@@ -76,7 +75,6 @@ impl AddAssign for Expression {
                     unimplemented!()
                 }
             }
-            _ => unimplemented!(),
         }
     }
 }
@@ -91,7 +89,6 @@ impl Debug for Expression {
                 "({})",
                 join(values.iter().map(|e| format!("{:?}", e)), "+")
             ),
-            Expression::Product(left, right) => write!(f, "({:?} * {:?})", left, right),
         }
     }
 }
@@ -110,24 +107,24 @@ impl PartialEq for Expression {
                 }
                 _ => unimplemented!(),
             },
-            Expression::Input(index) => {
+            Expression::Input(_) => {
                 if let Expression::Input(_) = other {
                     unimplemented!()
                 } else {
                     false
                 }
             }
-            Expression::Sum(values) => match other {
+            Expression::Sum(_) => match other {
                 Expression::Literal(_) => false,
                 _ => unimplemented!(),
             },
-            Expression::Product(left, right) => unimplemented!(),
         }
     }
 }
 
 type Register = VecDeque<Box<Expression>>;
 
+#[derive(Clone)]
 struct RegisterFile {
     x: Register,
     y: Register,
@@ -167,12 +164,12 @@ impl RegisterFile {
         }
     }
 
-    fn mask(&mut self, name: RegisterName) {
+    fn set_all(&mut self, name: RegisterName, values: VecDeque<Box<Expression>>) {
         match name {
-            RegisterName::X => self.x.resize(1, Expression::new_literal(1234)),
-            RegisterName::Y => self.y.resize(1, Expression::new_literal(1234)),
-            RegisterName::Z => self.z.resize(1, Expression::new_literal(1234)),
-            RegisterName::W => self.w.resize(1, Expression::new_literal(1234)),
+            RegisterName::X => self.x = values,
+            RegisterName::Y => self.y = values,
+            RegisterName::Z => self.z = values,
+            RegisterName::W => self.w = values,
         }
     }
 
@@ -184,11 +181,46 @@ impl RegisterFile {
             RegisterName::W => &mut self.w,
         };
 
+        if let Expression::Literal(0) = *value {
+            return;
+        }
+
         if register.len() == 1 {
             *register[0] += *value
         } else {
-            unimplemented!()
+            if let Expression::Literal(0) = *register[0] {
+                *register[0] = *value
+            } else {
+                unimplemented!()
+            }
         }
+    }
+
+    fn mask(&mut self, name: RegisterName) {
+        match name {
+            RegisterName::X => self.x.resize(1, Expression::new_literal(1234)),
+            RegisterName::Y => self.y.resize(1, Expression::new_literal(1234)),
+            RegisterName::Z => self.z.resize(1, Expression::new_literal(1234)),
+            RegisterName::W => self.w.resize(1, Expression::new_literal(1234)),
+        }
+    }
+
+    fn shift_up(&mut self, name: RegisterName) {
+        match name {
+            RegisterName::X => self.x.push_front(Expression::new_literal(0)),
+            RegisterName::Y => self.y.push_front(Expression::new_literal(0)),
+            RegisterName::Z => self.z.push_front(Expression::new_literal(0)),
+            RegisterName::W => self.w.push_front(Expression::new_literal(0)),
+        }
+    }
+
+    fn shift_down(&mut self, name: RegisterName) {
+        match name {
+            RegisterName::X => self.x.pop_front(),
+            RegisterName::Y => self.y.pop_front(),
+            RegisterName::Z => self.z.pop_front(),
+            RegisterName::W => self.w.pop_front(),
+        };
     }
 }
 
@@ -229,6 +261,48 @@ impl Debug for RegisterName {
             RegisterName::Z => f.write_str("z"),
             RegisterName::W => f.write_str("w"),
         }
+    }
+}
+
+#[derive(Clone)]
+enum ConstraintKind {
+    Equal,
+    NotEqual,
+}
+
+impl Debug for ConstraintKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ConstraintKind::Equal => "==",
+                ConstraintKind::NotEqual => "!=",
+            }
+        )
+    }
+}
+
+#[derive(Clone)]
+struct Constraint {
+    kind: ConstraintKind,
+    lhs: VecDeque<Box<Expression>>,
+    rhs: VecDeque<Box<Expression>>,
+}
+
+impl Constraint {
+    fn new(
+        kind: ConstraintKind,
+        lhs: VecDeque<Box<Expression>>,
+        rhs: VecDeque<Box<Expression>>,
+    ) -> Self {
+        Self { kind, lhs, rhs }
+    }
+}
+
+impl Debug for Constraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} {:?} {:?}", self.lhs, self.kind, self.rhs)
     }
 }
 
@@ -302,7 +376,12 @@ impl Instruction {
             .collect()
     }
 
-    fn execute(&self, register_file: &mut RegisterFile) {
+    fn execute(
+        &self,
+        register_file: &mut RegisterFile,
+        constraints: &[Constraint],
+        remainder: &[Instruction],
+    ) -> bool {
         match self {
             Instruction::Inp(destination) => {
                 register_file.set(*destination, Expression::new_input());
@@ -312,7 +391,7 @@ impl Instruction {
                 if destination_value.len() == 1 && *destination_value[0] == Expression::Literal(0) {
                     match source {
                         Source::Register(name) => {
-                            register_file.set(*destination, register_file.get(*name)[0].clone())
+                            register_file.set_all(*destination, register_file.get(*name).clone())
                         }
                         Source::Literal(value) => {
                             register_file.set(*destination, Expression::new_literal(*value))
@@ -351,6 +430,14 @@ impl Instruction {
                             && destination_value[0] == Expression::new_literal(0)
                         {
                             // Nothing happens
+                        } else if source_value.len() == 1
+                            && source_value[0] == Expression::new_literal(26)
+                        {
+                            register_file.shift_up(*destination)
+                        } else if source_value.len() == 1
+                            && source_value[0] == Expression::new_literal(0)
+                        {
+                            register_file.set(*destination, Expression::new_literal(0))
                         } else {
                             unimplemented!()
                         }
@@ -358,13 +445,11 @@ impl Instruction {
                     _ => unimplemented!(),
                 }
             }
-            Instruction::Div(destination, source) => {
-                if let Source::Literal(1) = source {
-                    // Nothing happens
-                } else {
-                    unimplemented!()
-                }
-            }
+            Instruction::Div(destination, source) => match source {
+                Source::Literal(1) => {}
+                Source::Literal(26) => register_file.shift_down(*destination),
+                _ => unimplemented!(),
+            },
             Instruction::Mod(destination, source) => {
                 if let Source::Literal(26) = source {
                     register_file.mask(*destination)
@@ -400,7 +485,47 @@ impl Instruction {
                                             register_file
                                                 .set(*destination, Expression::new_literal(0))
                                         } else {
-                                            unimplemented!()
+                                            // Split the universe
+                                            let equal_constraint = Constraint::new(
+                                                ConstraintKind::Equal,
+                                                destination_value.clone(),
+                                                source_value.clone(),
+                                            );
+                                            let equal_constraints: Vec<Constraint> = constraints
+                                                .iter()
+                                                .cloned()
+                                                .chain([equal_constraint])
+                                                .collect();
+                                            let mut equal_register_file = register_file.clone();
+                                            equal_register_file
+                                                .set(*destination, Expression::new_literal(1));
+                                            execute(
+                                                equal_register_file,
+                                                equal_constraints,
+                                                remainder,
+                                            );
+
+                                            let not_equal_constraint = Constraint::new(
+                                                ConstraintKind::NotEqual,
+                                                destination_value.clone(),
+                                                source_value.clone(),
+                                            );
+                                            let not_equal_constraints: Vec<Constraint> =
+                                                constraints
+                                                    .iter()
+                                                    .cloned()
+                                                    .chain([not_equal_constraint])
+                                                    .collect();
+                                            let mut not_equal_register_file = register_file.clone();
+                                            not_equal_register_file
+                                                .set(*destination, Expression::new_literal(0));
+                                            execute(
+                                                not_equal_register_file,
+                                                not_equal_constraints,
+                                                remainder,
+                                            );
+
+                                            return false;
                                         }
                                     } else {
                                         unimplemented!()
@@ -409,7 +534,6 @@ impl Instruction {
                                     unimplemented!()
                                 }
                             }
-                            _ => unimplemented!(),
                         }
                     }
                 }
@@ -424,6 +548,7 @@ impl Instruction {
                 }
             },
         }
+        true
     }
 }
 
@@ -450,21 +575,26 @@ impl Debug for Instruction {
     }
 }
 
-fn execute(instructions: &[Instruction]) {
-    let mut register_file = RegisterFile::new();
-
-    for instruction in instructions {
-        println!("{:?}", instruction);
-        instruction.execute(&mut register_file);
-        println!("{:?}", register_file);
+fn execute(
+    mut register_file: RegisterFile,
+    constraints: Vec<Constraint>,
+    instructions: &[Instruction],
+) {
+    for (index, instruction) in instructions.iter().enumerate() {
+        // println!("{} {:?}", index, instruction);
+        if !instruction.execute(&mut register_file, &constraints, &instructions[index + 1..]) {
+            return;
+        }
+        // println!("{:?} {:?}", constraints, register_file);
     }
+    println!("{:?} {:?}", constraints, register_file);
 }
 
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
     let instructions = Instruction::parse_from_lines(reader.lines().map(|line| line.unwrap()));
-    execute(&instructions);
+    execute(RegisterFile::new(), Vec::new(), &instructions);
 }
 
 #[cfg(test)]
