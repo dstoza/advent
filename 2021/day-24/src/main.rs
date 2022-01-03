@@ -418,63 +418,62 @@ impl Instruction {
             Source::Register(name) => {
                 let destination_value = register_file.get(destination);
                 let source_value = register_file.get(*name);
-                if destination_value.len() == 1 {
-                    match &destination_value[0] {
-                        Expression::Input(_) | Expression::Literal(_) => {
-                            let equal = destination_value == source_value;
-                            register_file.set(destination, Expression::new_literal(equal as i32));
-                        }
-                        Expression::Sum(values) => {
-                            let literal_sum: i32 = values
-                                .iter()
-                                .filter_map(|expression| {
-                                    if let Expression::Literal(value) = *expression {
-                                        Some(value)
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .sum();
-                            if source_value.len() == 1 {
-                                if let Expression::Input(_) = source_value[0] {
-                                    if literal_sum > 9 {
-                                        register_file.set(destination, Expression::new_literal(0));
-                                    } else {
-                                        // Split the universe
-                                        for kind in
-                                            [ConstraintKind::Equal, ConstraintKind::NotEqual]
-                                        {
-                                            let constraint = Constraint::new(
-                                                kind,
-                                                destination_value.clone(),
-                                                source_value.clone(),
-                                            );
-                                            let constraints: Vec<Constraint> = constraints
-                                                .iter()
-                                                .cloned()
-                                                .chain([constraint])
-                                                .collect();
-                                            let mut equal_register_file = register_file.clone();
-                                            let value = match kind {
-                                                ConstraintKind::Equal => 1,
-                                                ConstraintKind::NotEqual => 0,
-                                            };
-                                            equal_register_file
-                                                .set(destination, Expression::new_literal(value));
-                                            execute(equal_register_file, &constraints, remainder);
-                                        }
+                if destination_value.len() != 1 {
+                    unimplemented!();
+                }
 
-                                        return false;
-                                    }
+                match &destination_value[0] {
+                    Expression::Input(_) | Expression::Literal(_) => {
+                        let equal = destination_value == source_value;
+                        register_file.set(destination, Expression::new_literal(equal as i32));
+                    }
+                    Expression::Sum(values) => {
+                        let literal_sum: i32 = values
+                            .iter()
+                            .filter_map(|expression| {
+                                if let Expression::Literal(value) = *expression {
+                                    Some(value)
                                 } else {
-                                    unimplemented!()
+                                    None
                                 }
+                            })
+                            .sum();
+
+                        if source_value.len() != 1 {
+                            unimplemented!()
+                        }
+
+                        if let Expression::Input(_) = source_value[0] {
+                            if literal_sum > 9 {
+                                register_file.set(destination, Expression::new_literal(0));
                             } else {
-                                unimplemented!()
+                                // Split the universe
+                                for kind in [ConstraintKind::Equal, ConstraintKind::NotEqual] {
+                                    let constraint = Constraint::new(
+                                        kind,
+                                        destination_value.clone(),
+                                        source_value.clone(),
+                                    );
+                                    let constraints: Vec<Constraint> =
+                                        constraints.iter().cloned().chain([constraint]).collect();
+                                    let mut equal_register_file = register_file.clone();
+                                    let value = match kind {
+                                        ConstraintKind::Equal => 1,
+                                        ConstraintKind::NotEqual => 0,
+                                    };
+                                    equal_register_file
+                                        .set(destination, Expression::new_literal(value));
+                                    execute(equal_register_file, &constraints, remainder);
+                                }
+
+                                return false;
                             }
+                        } else {
+                            unimplemented!()
                         }
                     }
                 }
+
                 true
             }
             Source::Literal(value) => {
