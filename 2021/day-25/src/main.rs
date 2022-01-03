@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+#![feature(test)]
+extern crate test;
 
 use std::{
     fs::File,
@@ -93,7 +95,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::step_east;
+    use crate::*;
+
+    use test::Bencher;
 
     #[test]
     fn test_step_east() {
@@ -104,5 +108,17 @@ mod tests {
         assert_eq!(grid[0], vec![b'.', b'>', b'.', b'>', b'>']);
         step_east(&mut grid);
         assert_eq!(grid[0], vec![b'>', b'.', b'>', b'>', b'.']);
+    }
+
+    #[bench]
+    fn bench_input(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let grid = &mut reader
+            .lines()
+            .map(|line| line.unwrap().into_bytes())
+            .collect::<Vec<_>>();
+
+        b.iter(|| assert_eq!(count_until_stop(&mut grid.clone()), 321))
     }
 }
