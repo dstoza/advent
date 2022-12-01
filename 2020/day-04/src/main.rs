@@ -132,7 +132,7 @@ impl PassportParser {
             let split: Vec<&str> = token.split(':').collect();
             assert!(
                 split.len() == 2,
-                format!("Expected two fields when splitting [{}]", token)
+                "Expected two fields when splitting [{}]", token
             );
 
             fields |= match *split.get(0).expect("Failed to get field name from split") {
