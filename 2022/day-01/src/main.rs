@@ -22,7 +22,7 @@ fn main() {
         }
     }
 
-    let max = top[0];
+    let max = top[2];
     println!("max: {max}");
     let top_sum: i32 = top.iter().sum();
     println!("top: {top_sum}");
