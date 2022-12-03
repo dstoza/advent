@@ -25,23 +25,21 @@ fn main() {
     let mut badge_sum = 0;
     let mut possible_badges = HashSet::new();
     for (elf_id, line) in reader.lines().map(std::result::Result::unwrap).enumerate() {
-        let mut first_compartment_contents = HashSet::<u8>::new();
-        for item in line.as_bytes().iter().take(line.len() / 2) {
-            first_compartment_contents.insert(*item);
-        }
+        let bytes = line.as_bytes();
 
-        let mut contents = first_compartment_contents.clone();
-        let mut common_item = None;
-        for item in line.as_bytes().iter().skip(line.len() / 2) {
-            contents.insert(*item);
-            if first_compartment_contents.contains(item) {
-                common_item = Some(*item);
-            }
-        }
-        let common_item = common_item.unwrap();
+        let first_compartment_contents: HashSet<_> =
+            bytes.iter().take(line.len() / 2).copied().collect();
+
+        let second_compartment_contents: HashSet<_> =
+            bytes.iter().skip(line.len() / 2).copied().collect();
+
+        let common_contents = &first_compartment_contents & &second_compartment_contents;
+        assert!(common_contents.len() == 1);
+        let common_item = *common_contents.iter().next().unwrap();
 
         rucksack_sum += get_item_priority(common_item);
 
+        let contents = &first_compartment_contents | &second_compartment_contents;
         if elf_id % 3 == 0 {
             possible_badges = contents;
         } else {
