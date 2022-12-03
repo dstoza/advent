@@ -35,9 +35,7 @@ fn main() {
 
         let common_contents = &first_compartment_contents & &second_compartment_contents;
         assert!(common_contents.len() == 1);
-        let common_item = *common_contents.iter().next().unwrap();
-
-        rucksack_sum += get_item_priority(common_item);
+        rucksack_sum += get_item_priority(*common_contents.iter().next().unwrap());
 
         let contents = &first_compartment_contents | &second_compartment_contents;
         if elf_id % 3 == 0 {
