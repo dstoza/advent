@@ -7,7 +7,7 @@ use std::{
 };
 
 struct Directory {
-    pub name: String,
+    name: String,
     parent: Weak<RefCell<Self>>,
     contents: Vec<Node>,
 }
@@ -64,7 +64,7 @@ struct File {
 }
 
 impl File {
-    pub fn new(name: String, size: usize) -> Self {
+    fn new(name: String, size: usize) -> Self {
         Self { _name: name, size }
     }
 }
