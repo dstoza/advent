@@ -46,21 +46,6 @@ impl Directory {
             .sum()
     }
 
-    fn get_capped_total_size(&self, cap: usize) -> usize {
-        let total_size = self.get_total_size();
-        let total_size = if total_size > cap { 0 } else { total_size };
-
-        total_size
-            + self
-                .contents
-                .iter()
-                .filter_map(|node| match node {
-                    Node::Directory(d) => Some(d.borrow().get_capped_total_size(cap)),
-                    Node::File(_) => None,
-                })
-                .sum::<usize>()
-    }
-
     fn get_directory_sizes(&self) -> Vec<(String, usize)> {
         let mut sizes = vec![(self.name.clone(), self.get_total_size())];
         for mut child in self.contents.iter().filter_map(|node| match node {
@@ -160,15 +145,16 @@ fn main() {
 
     let root = parse_file_tree(reader.lines().map(std::result::Result::unwrap));
 
-    println!(
-        "Total capped size {}",
-        root.borrow().get_capped_total_size(100_000)
-    );
+    let mut directory_sizes = root.borrow().get_directory_sizes();
+    let total_capped_size: usize = directory_sizes
+        .iter()
+        .map(|(_name, size)| if *size <= 100_000 { *size } else { 0 })
+        .sum();
+    println!("Total capped size {total_capped_size}");
 
     let to_free = root.borrow().get_total_size() - 40_000_000;
     println!("Need to free {to_free}");
 
-    let mut directory_sizes = root.borrow().get_directory_sizes();
     directory_sizes.sort_unstable_by_key(|(_name, size)| *size);
     let (name, size) = directory_sizes
         .iter()
