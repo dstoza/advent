@@ -80,9 +80,6 @@ fn parse_file_tree(lines: impl Iterator<Item = String>) -> Rc<RefCell<Directory>
     // Skip the first line and create the root node
     lines.next();
     let root = Directory::new(String::from("/"), Weak::new());
-
-    // Allow the redundant clone, because we need to keep holding onto the root node to keep it from being deallocated
-    #[allow(clippy::redundant_clone)]
     let mut current = root.clone();
 
     let mut line = lines.next().unwrap();
@@ -123,17 +120,7 @@ fn parse_file_tree(lines: impl Iterator<Item = String>) -> Rc<RefCell<Directory>
         }
     }
 
-    // Traverse back up to the root
-    loop {
-        let maybe_parent = current.borrow().parent.upgrade();
-        if let Some(parent) = maybe_parent {
-            current = parent.clone();
-        } else {
-            break;
-        }
-    }
-
-    current
+    root
 }
 
 fn main() {
