@@ -4,47 +4,11 @@ use std::{
     iter::Iterator,
 };
 
-fn visible_from_left(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
-    for c in (0..column).rev() {
-        if grid[row][c] >= grid[row][column] {
-            return false;
-        }
-    }
-    true
-}
-
-fn visible_from_right(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
-    for c in column + 1..grid[row].len() {
-        if grid[row][c] >= grid[row][column] {
-            return false;
-        }
-    }
-    true
-}
-
-fn visible_from_top(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
-    for r in (0..row).rev() {
-        if grid[r][column] >= grid[row][column] {
-            return false;
-        }
-    }
-    true
-}
-
-fn visible_from_bottom(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
-    for r in row + 1..grid.len() {
-        if grid[r][column] >= grid[row][column] {
-            return false;
-        }
-    }
-    true
-}
-
 fn visible(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
-    visible_from_left(row, column, grid)
-        || visible_from_right(row, column, grid)
-        || visible_from_top(row, column, grid)
-        || visible_from_bottom(row, column, grid)
+    (0..column).rev().all(|c| grid[row][c] < grid[row][column])
+        || (column + 1..grid[row].len()).all(|c| grid[row][c] < grid[row][column])
+        || (0..row).rev().all(|r| grid[r][column] < grid[row][column])
+        || (row + 1..grid.len()).all(|r| grid[r][column] < grid[row][column])
 }
 
 fn viewing_distance_left(row: usize, column: usize, grid: &[Vec<u8>]) -> usize {
