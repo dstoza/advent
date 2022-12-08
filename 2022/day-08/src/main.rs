@@ -8,10 +8,9 @@ use std::{
     iter::Iterator,
 };
 
-fn parse_grid(reader: BufReader<File>) -> Vec<Vec<u8>> {
-    reader
-        .lines()
-        .map(|line| line.unwrap().bytes().map(|c| c - b'0').collect())
+fn parse_grid(lines: impl Iterator<Item = String>) -> Vec<Vec<u8>> {
+    lines
+        .map(|line| line.bytes().map(|c| c - b'0').collect())
         .collect()
 }
 
@@ -102,7 +101,7 @@ fn main() {
         File::open(&filename).unwrap_or_else(|_| panic!("Couldn't open {}", filename.as_str()));
     let reader = BufReader::new(file);
 
-    let grid = parse_grid(reader);
+    let grid = parse_grid(reader.lines().map(std::result::Result::unwrap));
 
     let visible_trees = count_visible_trees(&grid);
     println!("{visible_trees} visible trees");
@@ -117,11 +116,23 @@ mod tests {
     use test::Bencher;
 
     #[bench]
+    fn bench_parse_grid(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+        let lines: Vec<_> = reader.lines().map(std::result::Result::unwrap).collect();
+
+        b.iter(|| {
+            let grid = parse_grid(lines.clone().into_iter());
+            assert_eq!(grid.len(), 99);
+        });
+    }
+
+    #[bench]
     fn bench_count_visible_trees(b: &mut Bencher) {
         let file = File::open("input.txt").unwrap();
         let reader = BufReader::new(file);
 
-        let grid = parse_grid(reader);
+        let grid = parse_grid(reader.lines().map(std::result::Result::unwrap));
 
         b.iter(|| {
             let visible_trees = count_visible_trees(&grid);
@@ -134,7 +145,7 @@ mod tests {
         let file = File::open("input.txt").unwrap();
         let reader = BufReader::new(file);
 
-        let grid = parse_grid(reader);
+        let grid = parse_grid(reader.lines().map(std::result::Result::unwrap));
 
         b.iter(|| {
             let scenic_score = max_scenic_score(&grid);
