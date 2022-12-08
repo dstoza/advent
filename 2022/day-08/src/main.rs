@@ -1,14 +1,37 @@
 #![warn(clippy::pedantic)]
+#![feature(test)]
+extern crate test;
+
 use std::{
+    fs::File,
     io::{BufRead, BufReader},
     iter::Iterator,
 };
+
+fn parse_grid(reader: BufReader<File>) -> Vec<Vec<u8>> {
+    reader
+        .lines()
+        .map(|line| line.unwrap().bytes().map(|c| c - b'0').collect())
+        .collect()
+}
 
 fn visible(row: usize, column: usize, grid: &[Vec<u8>]) -> bool {
     (0..column).rev().all(|c| grid[row][c] < grid[row][column])
         || (column + 1..grid[row].len()).all(|c| grid[row][c] < grid[row][column])
         || (0..row).rev().all(|r| grid[r][column] < grid[row][column])
         || (row + 1..grid.len()).all(|r| grid[r][column] < grid[row][column])
+}
+
+fn count_visible_trees(grid: &[Vec<u8>]) -> usize {
+    let mut visible_trees = 0;
+    for row in 0..grid.len() {
+        for column in 0..grid[row].len() {
+            if visible(row, column, grid) {
+                visible_trees += 1;
+            }
+        }
+    }
+    visible_trees
 }
 
 fn viewing_distance_left(row: usize, column: usize, grid: &[Vec<u8>]) -> usize {
@@ -62,35 +85,60 @@ fn scenic_score(row: usize, column: usize, grid: &[Vec<u8>]) -> usize {
         * viewing_distance_down(row, column, grid)
 }
 
-fn main() {
-    let filename = std::env::args().nth(1).expect("Filename not found");
-
-    let file = std::fs::File::open(&filename)
-        .unwrap_or_else(|_| panic!("Couldn't open {}", filename.as_str()));
-    let reader = BufReader::new(file);
-
-    let grid: Vec<Vec<_>> = reader
-        .lines()
-        .map(|line| line.unwrap().bytes().map(|c| c - b'0').collect())
-        .collect();
-
-    let mut visible_trees = 0;
-    for row in 0..grid.len() {
-        for column in 0..grid[row].len() {
-            if visible(row, column, &grid) {
-                visible_trees += 1;
-            }
-        }
-    }
-
-    println!("{visible_trees} visible trees");
-
+fn max_scenic_score(grid: &[Vec<u8>]) -> usize {
     let mut max_scenic_score = 0;
     for row in 0..grid.len() {
         for column in 0..grid[row].len() {
-            max_scenic_score = max_scenic_score.max(scenic_score(row, column, &grid));
+            max_scenic_score = max_scenic_score.max(scenic_score(row, column, grid));
         }
     }
+    max_scenic_score
+}
 
-    println!("Max scenic score {max_scenic_score}");
+fn main() {
+    let filename = std::env::args().nth(1).expect("Filename not found");
+
+    let file =
+        File::open(&filename).unwrap_or_else(|_| panic!("Couldn't open {}", filename.as_str()));
+    let reader = BufReader::new(file);
+
+    let grid = parse_grid(reader);
+
+    let visible_trees = count_visible_trees(&grid);
+    println!("{visible_trees} visible trees");
+
+    let scenic_score = max_scenic_score(&grid);
+    println!("Max scenic score {scenic_score}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_count_visible_trees(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+
+        let grid = parse_grid(reader);
+
+        b.iter(|| {
+            let visible_trees = count_visible_trees(&grid);
+            assert_eq!(visible_trees, 1823);
+        });
+    }
+
+    #[bench]
+    fn bench_max_scenic_score(b: &mut Bencher) {
+        let file = File::open("input.txt").unwrap();
+        let reader = BufReader::new(file);
+
+        let grid = parse_grid(reader);
+
+        b.iter(|| {
+            let scenic_score = max_scenic_score(&grid);
+            assert_eq!(scenic_score, 211_680);
+        });
+    }
 }
