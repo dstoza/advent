@@ -41,7 +41,7 @@ fn simulate_rope(lines: impl Iterator<Item = String>, rope_length: usize) -> usi
     for line in lines {
         let mut split = line.split(' ');
         let direction = split.next().unwrap();
-        let step_count: i32 = split.next().unwrap().parse().unwrap();
+        let step_count = split.next().unwrap().parse().unwrap();
 
         for _ in 0..step_count {
             match direction {
