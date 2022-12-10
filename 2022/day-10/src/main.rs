@@ -45,25 +45,22 @@ fn run_program(lines: impl Iterator<Item = String>) -> (SignalStrength, Pixels) 
             if (cpu.cycle - 20) % 40 == 0 {
                 signal_strength += cpu.cycle * cpu.x;
             }
+            cpu.cycle += 1;
 
             pixels.push(cpu.get_pixel(pixel_index));
             advance_pixel_index(&mut pixel_index);
-
-            cpu.cycle += 1;
         } else {
-            let value: i32 = line.strip_prefix("addx ").unwrap().parse().unwrap();
-            if (cpu.cycle - 20) % 40 == 0 {
-                signal_strength += cpu.cycle * cpu.x;
-            } else if (cpu.cycle + 1 - 20) % 40 == 0 {
-                signal_strength += (cpu.cycle + 1) * cpu.x;
-            }
-
             for _ in 0..2 {
+                if (cpu.cycle - 20) % 40 == 0 {
+                    signal_strength += cpu.cycle * cpu.x;
+                }
+                cpu.cycle += 1;
+
                 pixels.push(cpu.get_pixel(pixel_index));
                 advance_pixel_index(&mut pixel_index);
             }
 
-            cpu.cycle += 2;
+            let value: i32 = line.strip_prefix("addx ").unwrap().parse().unwrap();
             cpu.x += value;
         }
     }
