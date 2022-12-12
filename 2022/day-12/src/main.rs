@@ -82,10 +82,7 @@ fn get_shortest_path_length(
     start: Location,
     end: Location,
 ) -> Option<usize> {
-    let mut shortest_to_location = Vec::new();
-    for _ in 0..heightmap.len() {
-        shortest_to_location.push(vec![usize::MAX; heightmap[0].len()]);
-    }
+    let mut shortest_to_location = vec![vec![usize::MAX; heightmap[0].len()]; heightmap.len()];
 
     let mut queue = VecDeque::new();
     queue.push_back(vec![start]);
