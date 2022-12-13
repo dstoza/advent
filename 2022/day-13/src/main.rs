@@ -130,8 +130,7 @@ fn main() {
         let right = Packet::parse(&mut lines.next().unwrap().chars().peekable());
         lines.next(); // Consume the blank line
 
-        let ordering = left.cmp(&right);
-        if let Ordering::Less = ordering {
+        if left < right {
             index_sum += index;
         }
         index += 1;
