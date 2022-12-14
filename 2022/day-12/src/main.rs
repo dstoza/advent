@@ -9,7 +9,7 @@ use std::{
 
 type Heightmap = Vec<Vec<u8>>;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Location {
     row: usize,
     column: usize,
@@ -53,64 +53,50 @@ fn get_potential_moves(from: Location, heightmap: &Heightmap) -> Vec<Location> {
     let mut potential_moves = Vec::new();
 
     // Left
-    if from.column > 0 && heightmap[from.row][from.column - 1] <= from_height + 1 {
+    if from.column > 0 && heightmap[from.row][from.column - 1] + 1 >= from_height {
         potential_moves.push(Location::new(from.row, from.column - 1));
     }
 
     // Right
     if from.column < heightmap[from.row].len() - 1
-        && heightmap[from.row][from.column + 1] <= from_height + 1
+        && heightmap[from.row][from.column + 1] + 1 >= from_height
     {
         potential_moves.push(Location::new(from.row, from.column + 1));
     }
 
     // Up
-    if from.row > 0 && heightmap[from.row - 1][from.column] <= from_height + 1 {
+    if from.row > 0 && heightmap[from.row - 1][from.column] + 1 >= from_height {
         potential_moves.push(Location::new(from.row - 1, from.column));
     }
 
     // Down
-    if from.row < heightmap.len() - 1 && heightmap[from.row + 1][from.column] <= from_height + 1 {
+    if from.row < heightmap.len() - 1 && heightmap[from.row + 1][from.column] + 1 >= from_height {
         potential_moves.push(Location::new(from.row + 1, from.column));
     }
 
     potential_moves
 }
 
-fn get_shortest_path_length(
-    heightmap: &Heightmap,
-    start: Location,
-    end: Location,
-) -> Option<usize> {
-    let mut shortest_to_location = vec![vec![usize::MAX; heightmap[0].len()]; heightmap.len()];
+fn get_all_shortest_paths(heightmap: &Heightmap, end: Location) -> Vec<Vec<usize>> {
+    let mut shortest_paths = vec![vec![usize::MAX; heightmap[0].len()]; heightmap.len()];
+    shortest_paths[end.row][end.column] = 0;
 
     let mut queue = VecDeque::new();
-    queue.push_back(vec![start]);
+    queue.push_back(end);
 
     while !queue.is_empty() {
-        let path = queue.pop_front().unwrap();
+        let from = queue.pop_front().unwrap();
+        let path_length_to_here = shortest_paths[from.row][from.column];
 
-        let last_location = *path.last().unwrap();
-        if shortest_to_location[last_location.row][last_location.column] <= path.len() {
-            continue;
-        }
-
-        shortest_to_location[last_location.row][last_location.column] = path.len();
-
-        let potential_moves = get_potential_moves(*path.last().unwrap(), heightmap);
-
-        if potential_moves.contains(&end) {
-            return Some(path.len());
-        }
-
-        for potential_move in potential_moves.iter().filter(|m| !path.contains(m)) {
-            let mut new_path = path.clone();
-            new_path.push(*potential_move);
-            queue.push_back(new_path);
+        for potential_move in get_potential_moves(from, heightmap) {
+            if path_length_to_here + 1 < shortest_paths[potential_move.row][potential_move.column] {
+                shortest_paths[potential_move.row][potential_move.column] = path_length_to_here + 1;
+                queue.push_back(potential_move);
+            }
         }
     }
 
-    None
+    shortest_paths
 }
 
 fn main() {
@@ -123,24 +109,26 @@ fn main() {
 
     let (heightmap, start, end) = parse_map(lines);
 
+    let shortest_paths = get_all_shortest_paths(&heightmap, end);
+
     println!(
         "From current position: {}",
-        get_shortest_path_length(&heightmap, start, end).unwrap()
+        shortest_paths[start.row][start.column]
     );
 
-    let mut minimum = usize::MAX;
-    for row in 0..heightmap.len() {
-        for column in 0..heightmap[row].len() {
-            if heightmap[row][column] != 0 {
-                break;
+    let heightmap_flattened = heightmap.iter().flat_map(|row| row.iter());
+    let best_complete_length = shortest_paths
+        .iter()
+        .flat_map(|row| row.iter())
+        .zip(heightmap_flattened)
+        .filter_map(|(shortest_path, height)| {
+            if *height == 0 {
+                Some(shortest_path)
+            } else {
+                None
             }
-
-            if let Some(length) =
-                get_shortest_path_length(&heightmap, Location::new(row, column), end)
-            {
-                minimum = minimum.min(length);
-            }
-        }
-    }
-    println!("From best position: {minimum}");
+        })
+        .min()
+        .unwrap();
+    println!("From best position: {}", best_complete_length);
 }
