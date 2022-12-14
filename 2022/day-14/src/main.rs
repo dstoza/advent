@@ -9,12 +9,12 @@ use std::{
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 struct Location {
-    x: i32,
-    y: i32,
+    x: u16,
+    y: u16,
 }
 
 impl Location {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(x: u16, y: u16) -> Self {
         Self { x, y }
     }
 
@@ -95,7 +95,7 @@ fn falls_down(sand_location: &mut Location, cave: &HashSet<Location>) -> bool {
     }
 }
 
-fn count_drops_until_void(mut cave: HashSet<Location>, void_depth: i32) -> usize {
+fn count_drops_until_void(mut cave: HashSet<Location>, void_depth: u16) -> usize {
     let mut drops = 0;
     loop {
         let mut sand_location = Location::new(500, 0);
@@ -124,7 +124,7 @@ fn count_drops_until_void(mut cave: HashSet<Location>, void_depth: i32) -> usize
     drops
 }
 
-fn count_drops_until_full(mut cave: HashSet<Location>, void_depth: i32) -> usize {
+fn count_drops_until_full(mut cave: HashSet<Location>, void_depth: u16) -> usize {
     let mut drops = 0;
     while !cave.contains(&Location::new(500, 0)) {
         let mut sand_location = Location::new(500, 0);
