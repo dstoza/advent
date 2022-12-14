@@ -78,32 +78,30 @@ impl Packet {
 
 impl std::cmp::Ord for Packet {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self {
-            Packet::Integer(self_int) => {
-                if let Packet::Integer(other_int) = other {
-                    return self_int.cmp(other_int);
-                }
+        match (self, other) {
+            (Packet::Integer(self_int), Packet::Integer(other_int)) => self_int.cmp(other_int),
+            (Packet::Integer(self_int), Packet::List(_)) => {
                 Packet::new_list_from_integer(*self_int).cmp(other)
             }
-            Packet::List(self_list) => match other {
-                Packet::List(other_list) => {
-                    for index in 0..self_list.len().max(other_list.len()) {
-                        if index >= self_list.len() {
-                            return Ordering::Less;
-                        }
-                        if index >= other_list.len() {
-                            return Ordering::Greater;
-                        }
-                        let ordering = self_list[index].cmp(&other_list[index]);
-                        if let Ordering::Equal = ordering {
-                            continue;
-                        }
-                        return ordering;
+            (Packet::List(_), Packet::Integer(other_int)) => {
+                self.cmp(&Packet::new_list_from_integer(*other_int))
+            }
+            (Packet::List(self_list), Packet::List(other_list)) => {
+                for index in 0..self_list.len().max(other_list.len()) {
+                    if index >= self_list.len() {
+                        return Ordering::Less;
                     }
-                    Ordering::Equal
+                    if index >= other_list.len() {
+                        return Ordering::Greater;
+                    }
+                    let ordering = self_list[index].cmp(&other_list[index]);
+                    if let Ordering::Equal = ordering {
+                        continue;
+                    }
+                    return ordering;
                 }
-                Packet::Integer(other_int) => self.cmp(&Packet::new_list_from_integer(*other_int)),
-            },
+                Ordering::Equal
+            }
         }
     }
 }
