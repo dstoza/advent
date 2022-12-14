@@ -95,42 +95,18 @@ fn falls_down(sand_location: &mut Location, cave: &HashSet<Location>) -> bool {
     }
 }
 
-fn count_drops_until_void(mut cave: HashSet<Location>, void_depth: u16) -> usize {
+fn count_drops(mut cave: HashSet<Location>, void_depth: u16) -> (usize, usize) {
+    let mut drops_until_void = None;
     let mut drops = 0;
-    loop {
-        let mut sand_location = Location::new(500, 0);
-        loop {
-            if sand_location.y == void_depth {
-                // Sand has fallen into the void
-                break;
-            }
 
-            if falls_down(&mut sand_location, &cave) {
-                continue;
-            }
-
-            // Sand comes to rest
-            cave.insert(sand_location);
-            break;
-        }
-
-        if sand_location.y == void_depth {
-            break;
-        }
-
-        drops += 1;
-    }
-
-    drops
-}
-
-fn count_drops_until_full(mut cave: HashSet<Location>, void_depth: u16) -> usize {
-    let mut drops = 0;
     while !cave.contains(&Location::new(500, 0)) {
         let mut sand_location = Location::new(500, 0);
         loop {
             if sand_location.y == void_depth - 1 {
                 // Sand comes to rest on infinite floor
+                if drops_until_void.is_none() {
+                    drops_until_void = Some(drops);
+                }
                 cave.insert(sand_location);
                 break;
             }
@@ -147,7 +123,7 @@ fn count_drops_until_full(mut cave: HashSet<Location>, void_depth: u16) -> usize
         drops += 1;
     }
 
-    drops
+    (drops_until_void.unwrap(), drops)
 }
 
 fn main() {
@@ -162,9 +138,7 @@ fn main() {
 
     let void_depth = cave.iter().map(|rock| rock.y).max().unwrap() + 2;
 
-    let drops_until_void = count_drops_until_void(cave.clone(), void_depth);
+    let (drops_until_void, drops_until_full) = count_drops(cave, void_depth);
     println!("{drops_until_void} drops until void");
-
-    let drops_until_full = count_drops_until_full(cave, void_depth);
     println!("{drops_until_full} drops until full");
 }
