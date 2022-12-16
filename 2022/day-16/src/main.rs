@@ -1,5 +1,6 @@
 #![warn(clippy::pedantic)]
 
+use itertools::Itertools;
 use std::{
     collections::{BinaryHeap, HashSet},
     fs::File,
@@ -129,6 +130,8 @@ fn parse_graph(lines: impl Iterator<Item = String>) -> (Graph, Vec<FlowableValve
 
 type ElapsedTime = usize;
 
+const DURATION: usize = 26;
+
 #[derive(Clone, Debug, Eq)]
 struct State {
     position: String,
@@ -152,7 +155,7 @@ impl State {
     fn get_released(&self) -> usize {
         self.opened
             .iter()
-            .map(|(valve, opened_since)| (30 - opened_since) * valve.flow_rate)
+            .map(|(valve, opened_since)| (DURATION - opened_since) * valve.flow_rate)
             .sum()
     }
 
@@ -161,9 +164,11 @@ impl State {
             + self
                 .remaining
                 .iter()
-                .take((30 - self.time_elapsed) / 2)
+                .take((DURATION - self.time_elapsed) / 2)
                 .enumerate()
-                .map(|(index, valve)| (30 - self.time_elapsed - 2 * (1 + index)) * valve.flow_rate)
+                .map(|(index, valve)| {
+                    (DURATION - self.time_elapsed - 2 * (1 + index)) * valve.flow_rate
+                })
                 .sum::<usize>()
     }
 }
@@ -216,7 +221,7 @@ fn compute_maximum_pressure(graph: &Graph, flowable_valves: &[FlowableValve]) ->
             let distance_to_valve = graph.get_path_length(&state.position, &remaining.name);
             let valve_opened_at = state.time_elapsed + distance_to_valve + 1;
 
-            if valve_opened_at < 30 {
+            if valve_opened_at < DURATION {
                 let mut opened = state.opened.clone();
                 opened.push((remaining.clone(), valve_opened_at));
 
@@ -252,4 +257,30 @@ fn main() {
 
     let maximum_pressure = compute_maximum_pressure(&graph, &flowable_valves);
     println!("{maximum_pressure}");
+
+    let mut elephant_maximum = 0;
+    for mine in flowable_valves.iter().powerset() {
+        if mine.is_empty() {
+            continue;
+        }
+
+        if mine.len() > flowable_valves.len() {
+            break;
+        }
+
+        let mine: Vec<_> = mine.iter().map(|valve| (**valve).clone()).collect();
+        let elephants: Vec<_> = flowable_valves
+            .iter()
+            .filter(|valve| !mine.contains(valve))
+            .cloned()
+            .collect();
+
+        // println!("Checking {:?} {:?}", mine, elephants);
+
+        elephant_maximum = elephant_maximum.max(
+            compute_maximum_pressure(&graph, &mine) + compute_maximum_pressure(&graph, &elephants),
+        );
+    }
+
+    println!("{elephant_maximum}");
 }
