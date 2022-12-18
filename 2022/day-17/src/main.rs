@@ -238,6 +238,15 @@ impl Chamber {
             .unwrap()
     }
 
+    fn get_signature(&self) -> Vec<usize> {
+        let mut signature: Vec<_> = self.columns.iter().map(|column| column.len()).collect();
+        let minimum = signature.iter().copied().min().unwrap();
+        for s in &mut signature {
+            *s -= minimum;
+        }
+        signature
+    }
+
     fn is_occupied(&self, position: Position) -> bool {
         // println!("is_occupied {:?}", position);
 
@@ -301,32 +310,137 @@ fn main() {
 
     let mut chamber = Chamber::new();
 
-    for _ in 0..2022 {
-        let mut rock = Rock::new(
-            shape_cycle.next().unwrap(),
-            Position::new(2, chamber.get_top() + 3),
-        );
+    let mut last_seen = HashMap::new();
 
-        for command in &mut command_cycle {
-            // println!("{:?}", rock.position);
-            match command {
-                '<' => rock.move_left(&chamber),
-                '>' => rock.move_right(&chamber),
-                _ => unimplemented!(),
+    let mut possible_cycle = None;
+
+    let mut tower_heights = vec![0];
+
+    for iteration in 0..2000 {
+        for _ in 0..commands.len() {
+            let mut rock = Rock::new(
+                shape_cycle.next().unwrap(),
+                Position::new(2, chamber.get_top() + 3),
+            );
+
+            for command in &mut command_cycle {
+                match command {
+                    '<' => rock.move_left(&chamber),
+                    '>' => rock.move_right(&chamber),
+                    _ => unimplemented!(),
+                }
+
+                if !rock.move_down(&chamber) {
+                    chamber.place(rock);
+                    break;
+                }
             }
-            // println!("moved to {:?}", rock.position);
-
-            if !rock.move_down(&chamber) {
-                // println!("placed at {:?}", rock.position);
-                chamber.place(rock);
-                break;
-            }
-
-            // println!("moved down to {:?}", rock.position);
         }
 
-        // println!("{chamber}");
+        let tower_height = chamber.get_top();
+        let difference = tower_height - tower_heights.last().unwrap();
+        let mut signature = chamber.get_signature();
+
+        signature.push(difference);
+        if last_seen.contains_key(&signature) {
+            let last_seen_iteration = *last_seen.get(&signature).unwrap();
+            let cycle_length = iteration - last_seen_iteration;
+            if let Some((possible_length, _)) = possible_cycle {
+                if possible_length == cycle_length {
+                    // Cycle confirmed, break
+                    break;
+                }
+            }
+
+            possible_cycle = Some((cycle_length, last_seen_iteration));
+        } else {
+            possible_cycle = None;
+        }
+        last_seen.insert(signature, iteration);
+
+        tower_heights.push(tower_height);
     }
 
-    println!("{}", chamber.get_top());
+    if let Some((cycle_length, starting_iteration)) = possible_cycle {
+        println!(
+            "Cycle confirmed: {} iterations long, starting iteration {}",
+            cycle_length, starting_iteration
+        );
+
+        let mut rocks = 1_000_000_000_000;
+        rocks -= commands.len() * starting_iteration;
+        println!("{} rocks are part of a cycle", rocks);
+
+        let rocks_in_cycle = cycle_length * commands.len();
+        let cycles = rocks / rocks_in_cycle;
+        let growth_per_cycle = tower_heights[starting_iteration + 1 + cycle_length]
+            - tower_heights[starting_iteration + 1];
+        let growth_in_cycles = growth_per_cycle * cycles;
+        println!("{} growth in cycles", growth_in_cycles);
+
+        // TODO: Generalize
+        println!(
+            "{} including pre-cycle iterations",
+            growth_in_cycles + tower_heights[1]
+        );
+
+        let rocks_in_cycle = cycle_length * commands.len();
+        rocks %= rocks_in_cycle;
+        println!("{} rocks after mod reduction", rocks);
+
+        let mut chamber = Chamber::new();
+        let mut command_cycle = commands.iter().cycle();
+        let mut shape_cycle = shapes.iter().cycle();
+
+        for _ in 0..starting_iteration {
+            for _ in 0..commands.len() {
+                let mut rock = Rock::new(
+                    shape_cycle.next().unwrap(),
+                    Position::new(2, chamber.get_top() + 3),
+                );
+
+                for command in &mut command_cycle {
+                    match command {
+                        '<' => rock.move_left(&chamber),
+                        '>' => rock.move_right(&chamber),
+                        _ => unimplemented!(),
+                    }
+
+                    if !rock.move_down(&chamber) {
+                        chamber.place(rock);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let after_cycles = chamber.get_top();
+
+        for _ in 0..rocks {
+            let mut rock = Rock::new(
+                shape_cycle.next().unwrap(),
+                Position::new(2, chamber.get_top() + 3),
+            );
+
+            for command in &mut command_cycle {
+                match command {
+                    '<' => rock.move_left(&chamber),
+                    '>' => rock.move_right(&chamber),
+                    _ => unimplemented!(),
+                }
+
+                if !rock.move_down(&chamber) {
+                    chamber.place(rock);
+                    break;
+                }
+            }
+        }
+
+        println!("Adding a final {}", chamber.get_top() - after_cycles);
+
+        println!(
+            "Total: {}",
+            growth_in_cycles + tower_heights[1] + chamber.get_top() - after_cycles
+        );
+    }
 }
