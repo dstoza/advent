@@ -158,9 +158,12 @@ impl Shape {
     }
 }
 
-fn shape_would_collide<'a>(shape: &'a Shape, position: Position, chamber: &Chamber) -> bool {
-    shape
-        .left
+fn shape_would_collide<'a>(
+    shape_positions: &[Position],
+    position: Position,
+    chamber: &Chamber,
+) -> bool {
+    shape_positions
         .iter()
         .map(|l| *l + position)
         .any(|position| chamber.is_occupied(position))
@@ -181,7 +184,7 @@ impl<'a> Rock<'a> {
             return;
         }
 
-        if shape_would_collide(self.shape, self.position.next_left(), chamber) {
+        if shape_would_collide(&self.shape.left, self.position.next_left(), chamber) {
             return;
         }
 
@@ -193,7 +196,7 @@ impl<'a> Rock<'a> {
             return;
         }
 
-        if shape_would_collide(self.shape, self.position.next_right(), chamber) {
+        if shape_would_collide(&self.shape.right, self.position.next_right(), chamber) {
             return;
         }
 
@@ -205,7 +208,7 @@ impl<'a> Rock<'a> {
             return false;
         }
 
-        if shape_would_collide(self.shape, self.position.next_down(), chamber) {
+        if shape_would_collide(&self.shape.bottom, self.position.next_down(), chamber) {
             return false;
         }
 
@@ -236,6 +239,8 @@ impl Chamber {
     }
 
     fn is_occupied(&self, position: Position) -> bool {
+        // println!("is_occupied {:?}", position);
+
         if position.y >= self.columns[position.x].len() {
             return false;
         }
@@ -282,6 +287,7 @@ fn main() {
     let reader = BufReader::new(file);
     let mut lines = reader.lines().map(std::result::Result::unwrap);
     let commands: Vec<_> = lines.next().unwrap().chars().collect();
+    println!("found {} commands", commands.len());
     let mut command_cycle = commands.iter().cycle();
 
     let shapes = [
@@ -295,30 +301,32 @@ fn main() {
 
     let mut chamber = Chamber::new();
 
-    for _ in 0..4 {
+    for _ in 0..2022 {
         let mut rock = Rock::new(
             shape_cycle.next().unwrap(),
             Position::new(2, chamber.get_top() + 3),
         );
 
         for command in &mut command_cycle {
-            println!("{:?}", rock.position);
+            // println!("{:?}", rock.position);
             match command {
                 '<' => rock.move_left(&chamber),
                 '>' => rock.move_right(&chamber),
                 _ => unimplemented!(),
             }
-            println!("moved to {:?}", rock.position);
+            // println!("moved to {:?}", rock.position);
 
             if !rock.move_down(&chamber) {
-                println!("placed at {:?}", rock.position);
+                // println!("placed at {:?}", rock.position);
                 chamber.place(rock);
                 break;
             }
 
-            println!("moved down to {:?}", rock.position);
+            // println!("moved down to {:?}", rock.position);
         }
 
-        println!("{chamber}");
+        // println!("{chamber}");
     }
+
+    println!("{}", chamber.get_top());
 }
