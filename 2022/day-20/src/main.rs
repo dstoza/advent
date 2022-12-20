@@ -48,9 +48,9 @@ impl Ring {
         let current_previous = self.nodes[index].previous;
         let current_next = self.nodes[index].next;
 
-        // Wrap modulo the ring length
         let int_length = self.nodes.len() as i64;
 
+        // Wrap modulo the ring length
         let value = match value.cmp(&0) {
             std::cmp::Ordering::Less => -((-value) % (int_length - 1)),
             std::cmp::Ordering::Greater => value % (int_length - 1),
@@ -108,23 +108,12 @@ impl Ring {
         let mut index = self.nodes.iter().position(|node| node.value == 0).unwrap();
         let mut sum = 0;
         for iteration in 0..=3000 {
-            if iteration > 1 && iteration % 1000 == 0 {
+            if iteration > 0 && iteration % 1000 == 0 {
                 sum += self.nodes[index].value;
             }
             index = self.nodes[index].next;
         }
         sum
-    }
-}
-
-impl std::fmt::Debug for Ring {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut index = 0;
-        for _ in 0..self.nodes.len() {
-            writeln!(f, "{}", self.nodes[index].value)?;
-            index = self.nodes[index].next;
-        }
-        write!(f, "")
     }
 }
 
