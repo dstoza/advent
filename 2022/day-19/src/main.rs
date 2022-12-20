@@ -127,7 +127,8 @@ impl Cache {
             self.hits += 1;
         } else {
             self.misses += 1;
-            if self.misses % 1000000 == 0 {
+            if self.misses % 100_000 == 0 {
+                println!("{inventory:?} {production:?} {time_remaining}");
                 self.print_stats();
             }
         }
@@ -264,14 +265,22 @@ fn main() {
         .sum();
     println!("Quality sum: {quality_sum}");
 
-    let mut cache = Cache::new();
-    let geodes = count_geodes(
-        &mut cache,
-        &blueprints[2],
-        Resources::new(0, 0, 0, 0),
-        Resources::new(1, 0, 0, 0),
-        32,
-    );
-    println!("Geodes: {geodes}");
-    cache.print_stats();
+    let geode_product: usize = blueprints
+        .iter()
+        .take(3)
+        .map(|blueprint| {
+            println!("Processing {}", blueprint.id);
+            let mut cache = Cache::new();
+            let geodes = count_geodes(
+                &mut cache,
+                blueprint,
+                Resources::new(0, 0, 0, 0),
+                Resources::new(1, 0, 0, 0),
+                32,
+            );
+            cache.print_stats();
+            geodes
+        })
+        .product();
+    println!("Geodes: {geode_product}");
 }
