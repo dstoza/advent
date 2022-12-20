@@ -1,7 +1,6 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     iter::Iterator,
@@ -10,7 +9,7 @@ use std::{
 struct Node {
     previous: usize,
     next: usize,
-    value: i32,
+    value: i64,
 }
 
 struct Ring {
@@ -18,7 +17,7 @@ struct Ring {
 }
 
 impl Ring {
-    fn new(values: &[i32]) -> Self {
+    fn new(values: &[i64]) -> Self {
         let mut nodes: Vec<_> = values
             .iter()
             .enumerate()
@@ -43,63 +42,55 @@ impl Ring {
         self.nodes.len()
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        clippy::cast_sign_loss
-    )]
-    #[allow(clippy::comparison_chain)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn move_node(&mut self, index: usize) {
         let value = self.nodes[index].value;
         let current_previous = self.nodes[index].previous;
         let current_next = self.nodes[index].next;
 
-        // print!("{value} ");
+        // Wrap modulo the ring length
+        let int_length = self.nodes.len() as i64;
 
-        let int_length = self.nodes.len() as i32;
-        let value = if value < 0 {
-            -((-value) % (int_length - 1))
-        } else if value > 0 {
-            value % (int_length - 1)
-        } else {
-            value
+        let value = match value.cmp(&0) {
+            std::cmp::Ordering::Less => -((-value) % (int_length - 1)),
+            std::cmp::Ordering::Greater => value % (int_length - 1),
+            std::cmp::Ordering::Equal => value,
         };
-        
-        // print!("{value} ");
 
+        // Transform into [-length / 2, length / 2] to avoid insert/remove issues below
         let value = if value > int_length / 2 {
-            value - int_length + 1
+            value - (int_length - 1)
         } else if value < -int_length / 2 {
-            value + int_length - 1
+            value + (int_length - 1)
         } else {
             value
         };
-
-        // println!("{value} ");
 
         // First find the destination
-        let (destination_previous, destination_next) = if value < 0 {
-            let distance = ((-value) as usize) % self.nodes.len();
-            if distance == 0 {
-                return;
+        let (destination_previous, destination_next) = match value.cmp(&0) {
+            std::cmp::Ordering::Less => {
+                let distance = ((-value) as usize) % self.nodes.len();
+                if distance == 0 {
+                    return;
+                }
+                let mut previous_index = current_previous;
+                for _ in 0..distance {
+                    previous_index = self.nodes[previous_index].previous;
+                }
+                (previous_index, self.nodes[previous_index].next)
             }
-            let mut previous_index = current_previous;
-            for _ in 0..distance {
-                previous_index = self.nodes[previous_index].previous;
+            std::cmp::Ordering::Greater => {
+                let distance = (value as usize) % self.nodes.len();
+                if distance == 0 {
+                    return;
+                }
+                let mut next_index = current_next;
+                for _ in 0..distance {
+                    next_index = self.nodes[next_index].next;
+                }
+                (self.nodes[next_index].previous, next_index)
             }
-            (previous_index, self.nodes[previous_index].next)
-        } else if value > 0 {
-            let distance = (value as usize) % self.nodes.len();
-            if distance == 0 {
-                return;
-            }
-            let mut next_index = current_next;
-            for _ in 0..distance {
-                next_index = self.nodes[next_index].next;
-            }
-            (self.nodes[next_index].previous, next_index)
-        } else {
-            return;
+            std::cmp::Ordering::Equal => return,
         };
 
         // Remove the node from its current location
@@ -113,27 +104,16 @@ impl Ring {
         self.nodes[index].next = destination_next;
     }
 
-    fn get_grove_coordinates(&self) -> i32 {
+    fn get_grove_coordinates(&self) -> i64 {
         let mut index = self.nodes.iter().position(|node| node.value == 0).unwrap();
         let mut sum = 0;
         for iteration in 0..=3000 {
             if iteration > 1 && iteration % 1000 == 0 {
-                println!("{}", self.nodes[index].value);
                 sum += self.nodes[index].value;
             }
             index = self.nodes[index].next;
         }
         sum
-    }
-
-    fn get_contents(&self) -> HashMap<i32, usize> {
-        let mut hashmap = HashMap::new();
-        let mut index = 0;
-        for _ in 0..self.nodes.len() {
-            *hashmap.entry(self.nodes[index].value).or_default() += 1;
-            index = self.nodes[index].next;
-        }
-        hashmap
     }
 }
 
@@ -156,22 +136,27 @@ fn main() {
     let reader = BufReader::new(file);
     let lines = reader.lines().map(std::result::Result::unwrap);
     let values: Vec<_> = lines.map(|line| line.parse().unwrap()).collect();
-    let mut ring = Ring::new(&values);
 
-    let mut previous_contents = ring.get_contents();
-
-    // println!("{ring:?}");
-
-    for index in 0..ring.len() {
-        ring.move_node(index);
-        // println!("{ring:?}");
-        let contents = ring.get_contents();
-        if contents != previous_contents {
-            println!("Failed at {index}");
-            break;
-        }
-        previous_contents = contents;
+    let mut unencrypted_ring = Ring::new(&values);
+    for index in 0..unencrypted_ring.len() {
+        unencrypted_ring.move_node(index);
     }
 
-    println!("Grove coordinates: {}", ring.get_grove_coordinates());
+    println!(
+        "Unencrypted grove coordinates: {}",
+        unencrypted_ring.get_grove_coordinates()
+    );
+
+    let encrypted_values: Vec<_> = values.iter().map(|value| value * 811_589_153).collect();
+    let mut encrypted_ring = Ring::new(&encrypted_values);
+    for _ in 0..10 {
+        for index in 0..encrypted_ring.len() {
+            encrypted_ring.move_node(index);
+        }
+    }
+
+    println!(
+        "Encrypted grove coordinates: {}",
+        encrypted_ring.get_grove_coordinates()
+    );
 }
