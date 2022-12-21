@@ -26,6 +26,12 @@ impl Resources {
         }
     }
 
+    fn one(resource: Resource) -> Self {
+        let mut one = Self::default();
+        one.set_amount(resource, 1);
+        one
+    }
+
     fn contains(&self, other: Resources) -> bool {
         self.amounts
             .iter()
@@ -39,6 +45,12 @@ impl Resources {
 
     fn set_amount(&mut self, resource: Resource, amount: usize) {
         self.amounts[resource as usize] = amount;
+    }
+}
+
+impl std::default::Default for Resources {
+    fn default() -> Self {
+        Self { amounts: [0; 4] }
     }
 }
 
@@ -214,7 +226,7 @@ fn count_geodes(
             cache,
             blueprint,
             inventory + production - blueprint.get_robot_cost(Resource::Ore),
-            production + Resources::new(1, 0, 0, 0),
+            production + Resources::one(Resource::Ore),
             time_remaining - 1,
         ));
     }
@@ -229,7 +241,7 @@ fn count_geodes(
             cache,
             blueprint,
             inventory + production - blueprint.get_robot_cost(Resource::Clay),
-            production + Resources::new(0, 1, 0, 0),
+            production + Resources::one(Resource::Clay),
             time_remaining - 1,
         ));
     }
@@ -239,7 +251,7 @@ fn count_geodes(
             cache,
             blueprint,
             inventory + production - blueprint.get_robot_cost(Resource::Obsidian),
-            production + Resources::new(0, 0, 1, 0),
+            production + Resources::one(Resource::Obsidian),
             time_remaining - 1,
         ));
     }
@@ -249,7 +261,7 @@ fn count_geodes(
             cache,
             blueprint,
             inventory + production - blueprint.get_robot_cost(Resource::Geode),
-            production + Resources::new(0, 0, 0, 1),
+            production + Resources::one(Resource::Geode),
             time_remaining - 1,
         ));
     }
@@ -278,8 +290,8 @@ fn main() {
                 * count_geodes(
                     &mut cache,
                     blueprint,
-                    Resources::new(0, 0, 0, 0),
-                    Resources::new(1, 0, 0, 0),
+                    Resources::default(),
+                    Resources::one(Resource::Ore),
                     24,
                 );
             cache.print_stats();
@@ -297,8 +309,8 @@ fn main() {
             let geodes = count_geodes(
                 &mut cache,
                 blueprint,
-                Resources::new(0, 0, 0, 0),
-                Resources::new(1, 0, 0, 0),
+                Resources::default(),
+                Resources::one(Resource::Ore),
                 32,
             );
             cache.print_stats();
