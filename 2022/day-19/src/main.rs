@@ -32,6 +32,14 @@ impl Resources {
             .enumerate()
             .all(|(index, amount)| *amount >= other.amounts[index])
     }
+
+    fn get_amount(&self, resource: Resource) -> usize {
+        self.amounts[resource as usize]
+    }
+
+    fn set_amount(&mut self, resource: Resource, amount: usize) {
+        self.amounts[resource as usize] = amount;
+    }
 }
 
 impl std::ops::Add for Resources {
@@ -61,10 +69,7 @@ impl std::ops::Sub for Resources {
 #[derive(Debug)]
 struct Blueprint {
     id: usize,
-    ore_robot_cost: Resources,
-    clay_robot_cost: Resources,
-    obsidian_robot_cost: Resources,
-    geode_robot_cost: Resources,
+    robot_costs: [Resources; 4],
 }
 
 impl Blueprint {
@@ -75,18 +80,25 @@ impl Blueprint {
             .filter_map(|token| token.trim_end_matches(':').parse().ok());
         Self {
             id: split.next().unwrap(),
-            ore_robot_cost: Resources::new(split.next().unwrap(), 0, 0, 0),
-            clay_robot_cost: Resources::new(split.next().unwrap(), 0, 0, 0),
-            obsidian_robot_cost: Resources::new(split.next().unwrap(), split.next().unwrap(), 0, 0),
-            geode_robot_cost: Resources::new(split.next().unwrap(), 0, split.next().unwrap(), 0),
+            robot_costs: [
+                Resources::new(split.next().unwrap(), 0, 0, 0),
+                Resources::new(split.next().unwrap(), 0, 0, 0),
+                Resources::new(split.next().unwrap(), split.next().unwrap(), 0, 0),
+                Resources::new(split.next().unwrap(), 0, split.next().unwrap(), 0),
+            ],
         }
     }
 
+    fn get_robot_cost(&self, resource: Resource) -> Resources {
+        self.robot_costs[resource as usize]
+    }
+
     fn get_max_ore_cost(&self) -> usize {
-        self.ore_robot_cost.amounts[Resource::Ore as usize]
-            .max(self.clay_robot_cost.amounts[Resource::Ore as usize])
-            .max(self.obsidian_robot_cost.amounts[Resource::Ore as usize])
-            .max(self.geode_robot_cost.amounts[Resource::Ore as usize])
+        self.robot_costs
+            .iter()
+            .map(|cost| cost.get_amount(Resource::Ore))
+            .max()
+            .unwrap()
     }
 }
 
@@ -163,13 +175,24 @@ fn count_geodes(
     time_remaining: usize,
 ) -> usize {
     if time_remaining == 1 {
-        return (inventory + production).amounts[Resource::Geode as usize];
+        return (inventory + production).get_amount(Resource::Geode);
     }
 
-    inventory.amounts[Resource::Ore as usize] = inventory.amounts[Resource::Ore as usize]
-        .min(time_remaining * blueprint.get_max_ore_cost());
-    inventory.amounts[Resource::Clay as usize] = inventory.amounts[Resource::Clay as usize]
-        .min(time_remaining * blueprint.obsidian_robot_cost.amounts[Resource::Clay as usize]);
+    inventory.set_amount(
+        Resource::Ore,
+        inventory
+            .get_amount(Resource::Ore)
+            .min(time_remaining * blueprint.get_max_ore_cost()),
+    );
+    inventory.set_amount(
+        Resource::Clay,
+        inventory.get_amount(Resource::Clay).min(
+            time_remaining
+                * blueprint
+                    .get_robot_cost(Resource::Obsidian)
+                    .get_amount(Resource::Clay),
+        ),
+    );
 
     if let Some(geodes) = cache.get(inventory, production, time_remaining) {
         return geodes;
@@ -184,46 +207,48 @@ fn count_geodes(
         time_remaining - 1,
     );
 
-    if inventory.contains(blueprint.ore_robot_cost)
-        && production.amounts[Resource::Ore as usize] < blueprint.get_max_ore_cost()
+    if inventory.contains(blueprint.get_robot_cost(Resource::Ore))
+        && production.get_amount(Resource::Ore) < blueprint.get_max_ore_cost()
     {
         geodes = geodes.max(count_geodes(
             cache,
             blueprint,
-            inventory + production - blueprint.ore_robot_cost,
+            inventory + production - blueprint.get_robot_cost(Resource::Ore),
             production + Resources::new(1, 0, 0, 0),
             time_remaining - 1,
         ));
     }
 
-    if inventory.contains(blueprint.clay_robot_cost)
-        && production.amounts[Resource::Clay as usize]
-            < blueprint.obsidian_robot_cost.amounts[Resource::Clay as usize]
+    if inventory.contains(blueprint.get_robot_cost(Resource::Clay))
+        && production.get_amount(Resource::Clay)
+            < blueprint
+                .get_robot_cost(Resource::Obsidian)
+                .get_amount(Resource::Clay)
     {
         geodes = geodes.max(count_geodes(
             cache,
             blueprint,
-            inventory + production - blueprint.clay_robot_cost,
+            inventory + production - blueprint.get_robot_cost(Resource::Clay),
             production + Resources::new(0, 1, 0, 0),
             time_remaining - 1,
         ));
     }
 
-    if inventory.contains(blueprint.obsidian_robot_cost) {
+    if inventory.contains(blueprint.get_robot_cost(Resource::Obsidian)) {
         geodes = geodes.max(count_geodes(
             cache,
             blueprint,
-            inventory + production - blueprint.obsidian_robot_cost,
+            inventory + production - blueprint.get_robot_cost(Resource::Obsidian),
             production + Resources::new(0, 0, 1, 0),
             time_remaining - 1,
         ));
     }
 
-    if inventory.contains(blueprint.geode_robot_cost) {
+    if inventory.contains(blueprint.get_robot_cost(Resource::Geode)) {
         geodes = geodes.max(count_geodes(
             cache,
             blueprint,
-            inventory + production - blueprint.geode_robot_cost,
+            inventory + production - blueprint.get_robot_cost(Resource::Geode),
             production + Resources::new(0, 0, 0, 1),
             time_remaining - 1,
         ));
