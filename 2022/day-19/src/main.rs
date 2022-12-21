@@ -7,29 +7,30 @@ use std::{
     iter::Iterator,
 };
 
+enum Resource {
+    Ore,
+    Clay,
+    Obsidian,
+    Geode,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Resources {
-    ore: usize,
-    clay: usize,
-    obsidian: usize,
-    geode: usize,
+    amounts: [usize; 4],
 }
 
 impl Resources {
     fn new(ore: usize, clay: usize, obsidian: usize, geode: usize) -> Self {
-        Self {
-            ore,
-            clay,
-            obsidian,
-            geode,
+        Resources {
+            amounts: [ore, clay, obsidian, geode],
         }
     }
 
     fn contains(&self, other: Resources) -> bool {
-        self.ore >= other.ore
-            && self.clay >= other.clay
-            && self.obsidian >= other.obsidian
-            && self.geode >= other.geode
+        self.amounts
+            .iter()
+            .enumerate()
+            .all(|(index, amount)| *amount >= other.amounts[index])
     }
 }
 
@@ -37,12 +38,11 @@ impl std::ops::Add for Resources {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
-        Self {
-            ore: self.ore + rhs.ore,
-            clay: self.clay + rhs.clay,
-            obsidian: self.obsidian + rhs.obsidian,
-            geode: self.geode + rhs.geode,
+        let mut sum = self;
+        for (index, amount) in sum.amounts.iter_mut().enumerate() {
+            *amount += rhs.amounts[index];
         }
+        sum
     }
 }
 
@@ -50,12 +50,11 @@ impl std::ops::Sub for Resources {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
-        Self {
-            ore: self.ore - rhs.ore,
-            clay: self.clay - rhs.clay,
-            obsidian: self.obsidian - rhs.obsidian,
-            geode: self.geode - rhs.geode,
+        let mut difference = self;
+        for (index, amount) in difference.amounts.iter_mut().enumerate() {
+            *amount -= rhs.amounts[index];
         }
+        difference
     }
 }
 
@@ -84,11 +83,10 @@ impl Blueprint {
     }
 
     fn get_max_ore_cost(&self) -> usize {
-        self.ore_robot_cost
-            .ore
-            .max(self.clay_robot_cost.ore)
-            .max(self.obsidian_robot_cost.ore)
-            .max(self.geode_robot_cost.ore)
+        self.ore_robot_cost.amounts[Resource::Ore as usize]
+            .max(self.clay_robot_cost.amounts[Resource::Ore as usize])
+            .max(self.obsidian_robot_cost.amounts[Resource::Ore as usize])
+            .max(self.geode_robot_cost.amounts[Resource::Ore as usize])
     }
 }
 
@@ -165,15 +163,13 @@ fn count_geodes(
     time_remaining: usize,
 ) -> usize {
     if time_remaining == 1 {
-        return (inventory + production).geode;
+        return (inventory + production).amounts[Resource::Geode as usize];
     }
 
-    inventory.ore = inventory
-        .ore
+    inventory.amounts[Resource::Ore as usize] = inventory.amounts[Resource::Ore as usize]
         .min(time_remaining * blueprint.get_max_ore_cost());
-    inventory.clay = inventory
-        .clay
-        .min(time_remaining * blueprint.obsidian_robot_cost.clay);
+    inventory.amounts[Resource::Clay as usize] = inventory.amounts[Resource::Clay as usize]
+        .min(time_remaining * blueprint.obsidian_robot_cost.amounts[Resource::Clay as usize]);
 
     if let Some(geodes) = cache.get(inventory, production, time_remaining) {
         return geodes;
@@ -188,7 +184,8 @@ fn count_geodes(
         time_remaining - 1,
     );
 
-    if inventory.contains(blueprint.ore_robot_cost) && production.ore < blueprint.get_max_ore_cost()
+    if inventory.contains(blueprint.ore_robot_cost)
+        && production.amounts[Resource::Ore as usize] < blueprint.get_max_ore_cost()
     {
         geodes = geodes.max(count_geodes(
             cache,
@@ -200,7 +197,8 @@ fn count_geodes(
     }
 
     if inventory.contains(blueprint.clay_robot_cost)
-        && production.clay < blueprint.obsidian_robot_cost.clay
+        && production.amounts[Resource::Clay as usize]
+            < blueprint.obsidian_robot_cost.amounts[Resource::Clay as usize]
     {
         geodes = geodes.max(count_geodes(
             cache,
