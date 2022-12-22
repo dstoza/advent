@@ -7,6 +7,7 @@ use std::{
     iter::Iterator,
 };
 
+#[derive(Clone, Copy)]
 enum Resource {
     Ore,
     Clay,
@@ -179,6 +180,23 @@ impl Cache {
     }
 }
 
+fn count_geodes_with_factory(
+    cache: &mut Cache,
+    blueprint: &Blueprint,
+    inventory: Resources,
+    production: Resources,
+    time_remaining: usize,
+    factory_resource: Resource,
+) -> usize {
+    count_geodes(
+        cache,
+        blueprint,
+        inventory + production - blueprint.get_robot_cost(factory_resource),
+        production + Resources::one(factory_resource),
+        time_remaining - 1,
+    )
+}
+
 fn count_geodes(
     cache: &mut Cache,
     blueprint: &Blueprint,
@@ -222,13 +240,15 @@ fn count_geodes(
     if inventory.contains(blueprint.get_robot_cost(Resource::Ore))
         && production.get_amount(Resource::Ore) < blueprint.get_max_ore_cost()
     {
-        geodes = geodes.max(count_geodes(
+        let geodes_with_ore_factory = count_geodes_with_factory(
             cache,
             blueprint,
-            inventory + production - blueprint.get_robot_cost(Resource::Ore),
-            production + Resources::one(Resource::Ore),
-            time_remaining - 1,
-        ));
+            inventory,
+            production,
+            time_remaining,
+            Resource::Ore,
+        );
+        geodes = geodes.max(geodes_with_ore_factory);
     }
 
     if inventory.contains(blueprint.get_robot_cost(Resource::Clay))
