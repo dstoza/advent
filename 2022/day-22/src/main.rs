@@ -12,6 +12,7 @@ enum Turn {
     Left = 3,
 }
 
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 enum Facing {
     Right,
     Down,
@@ -31,15 +32,59 @@ impl Facing {
     }
 }
 
+struct WrapCache {
+    cache: HashMap<(Position, Facing), Option<Position>>,
+}
+
+impl WrapCache {
+    fn next(&mut self, position: Position, facing: Facing) -> Option<Position> {
+        if let Some(hit) = self.cache.get(&(position, facing)) {
+            return *hit;
+        }
+
+        // TODO: Step backwards until we find a blank space, then forwards one, check if it's a wall, then store/return the result
+
+        None
+    }
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 struct Position {
     row: usize,
     column: usize,
 }
 
 impl Position {
-    fn next(self, board: &[Vec<u8>], facing: Facing) -> Option<Self> {
-        // match facing {}
-        Some(Self { row: 0, column: 0 })
+    fn step(self, facing: Facing) -> Self {
+        match facing {
+            Facing::Right => Self {
+                row: self.row,
+                column: self.column + 1,
+            },
+            Facing::Down => Self {
+                row: self.row + 1,
+                column: self.column,
+            },
+            Facing::Left => Self {
+                row: self.row,
+                column: self.column - 1,
+            },
+            Facing::Up => Self {
+                row: self.row - 1,
+                column: self.column,
+            },
+        }
+    }
+
+    fn next(self, board: &[Vec<u8>], wrap_cache: &mut WrapCache, facing: Facing) -> Option<Self> {
+        let next_coordinates = self.step(facing);
+
+        match board[next_coordinates.row][next_coordinates.column] {
+            b'#' => None,
+            b'.' => Some(next_coordinates),
+            b' ' => wrap_cache.next(self, facing),
+            _ => unimplemented!(),
+        }
     }
 }
 
