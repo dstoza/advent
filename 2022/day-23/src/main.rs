@@ -109,16 +109,16 @@ fn get_bounds(elves: &HashSet<Position>) -> (RangeInclusive<i32>, RangeInclusive
 }
 
 // For each destination position, a vector of source elves that would like to move to that position
-type Proposals = HashMap<Position, Vec<Position>>;
+type Proposals = HashMap<Position, Option<Position>>;
 
 fn get_proposals(elves: &HashSet<Position>, direction_order: &[Direction]) -> Proposals {
     let mut proposals = Proposals::new();
 
     for elf in elves {
-        if !elf
+        if elf
             .get_all_neighbors()
             .iter()
-            .any(|neighbor| elves.contains(neighbor))
+            .all(|neighbor| !elves.contains(neighbor))
         {
             continue;
         }
@@ -129,10 +129,14 @@ fn get_proposals(elves: &HashSet<Position>, direction_order: &[Direction]) -> Pr
                 .iter()
                 .all(|neighbor| !elves.contains(neighbor))
             {
-                proposals
-                    .entry(elf.step(*direction))
-                    .or_default()
-                    .push(*elf);
+                match proposals.entry(elf.step(*direction)) {
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
+                        entry.insert(None);
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(Some(*elf));
+                    }
+                };
                 break;
             }
         }
@@ -142,12 +146,12 @@ fn get_proposals(elves: &HashSet<Position>, direction_order: &[Direction]) -> Pr
 }
 
 fn resolve_proposals(elves: &mut HashSet<Position>, proposals: Proposals) {
-    for (destination, sources) in proposals {
-        if sources.len() != 1 {
+    for (destination, source) in proposals {
+        if source.is_none() {
             continue;
         }
 
-        elves.remove(&sources[0]);
+        elves.remove(&source.unwrap());
         elves.insert(destination);
     }
 }
