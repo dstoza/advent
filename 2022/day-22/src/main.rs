@@ -176,7 +176,6 @@ fn run_commands(commands: &[Command], board: &[Vec<u8>]) {
                 for _ in 0..*steps {
                     let next_position = position.next(board, &mut wrap_cache, facing);
                     if let Some(next_position) = next_position {
-                        println!("{:?}", next_position);
                         position = next_position;
                     } else {
                         break;
@@ -197,13 +196,9 @@ fn main() {
         File::open(&filename).unwrap_or_else(|_| panic!("Couldn't open {}", filename.as_str()));
     let reader = BufReader::new(file);
     let mut lines = reader.lines().map(std::result::Result::unwrap);
-    let board = parse_board(&mut lines);
-    for line in &board {
-        println!("{:?}", line);
-    }
 
+    let board = parse_board(&mut lines);
     let commands = parse_commands(lines.next().unwrap());
-    println!("{:?}", commands);
 
     run_commands(&commands, &board);
 }
