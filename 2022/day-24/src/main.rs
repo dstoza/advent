@@ -8,7 +8,7 @@ use std::{
     usize,
 };
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Position {
     row: usize,
     column: usize,
@@ -19,8 +19,10 @@ impl Position {
         Self { row, column }
     }
 
-    fn distance_squared_from_origin(self) -> usize {
-        self.row * self.row + self.column * self.column
+    fn distance_squared_to(self, other: Self) -> usize {
+        let row_diff = self.row.abs_diff(other.row);
+        let column_diff = self.column.abs_diff(other.column);
+        row_diff * row_diff + column_diff * column_diff
     }
 }
 
@@ -44,8 +46,8 @@ fn parse_blizzards(mut lines: impl Iterator<Item = String>) -> (Vec<Blizzard>, W
     let mut blizzards = Vec::new();
     let mut height = 0;
     for (row, line) in lines.enumerate() {
-        let line = line.strip_prefix("#").unwrap().strip_suffix("#").unwrap();
-        if line.starts_with("#") {
+        let line = line.strip_prefix('#').unwrap().strip_suffix('#').unwrap();
+        if line.starts_with('#') {
             break;
         }
 
@@ -137,53 +139,41 @@ impl VacancyCache {
         }
     }
 
-    fn get_vacancies<'a>(&'a mut self, time: usize) -> &'a HashSet<Position> {
+    fn get_vacancies(&mut self, time: usize) -> &HashSet<Position> {
         self.resize_vacancies(time);
         &self.vacancies[time]
     }
-
-    fn print_vacancies(&mut self, time: usize) {
-        let width = self.width;
-        let height = self.height;
-        let vacancies = self.get_vacancies(time);
-        for row in 0..=height + 1 {
-            print!("#");
-            for column in 0..width {
-                if vacancies.contains(&Position::new(row, column)) {
-                    print!(".");
-                } else {
-                    print!("*");
-                }
-            }
-            println!("#");
-        }
-    }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct State {
-    position: Position,
+    current: Position,
+    destination: Position,
     time: usize,
 }
 
 impl State {
-    fn new(position: Position, time: usize) -> Self {
-        Self { position, time }
+    fn new(current: Position, destination: Position, time: usize) -> Self {
+        Self {
+            current,
+            destination,
+            time,
+        }
     }
 }
 
 impl std::cmp::Ord for State {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let comparison = self
-            .position
-            .distance_squared_from_origin()
-            .cmp(&other.position.distance_squared_from_origin());
+        let comparison = other.time.cmp(&self.time);
         match comparison {
-            // Pick the one farther from the origin
+            // First prefer the shortest time
             std::cmp::Ordering::Less | std::cmp::Ordering::Greater => comparison,
 
-            // If there is a tie, pick the one with less time elapsed
-            std::cmp::Ordering::Equal => other.time.cmp(&self.time),
+            // Otherwise prefer the one that is closer to the destination
+            std::cmp::Ordering::Equal => other
+                .current
+                .distance_squared_to(other.destination)
+                .cmp(&self.current.distance_squared_to(self.destination)),
         }
     }
 }
@@ -210,19 +200,54 @@ fn get_neighbors(position: Position, width: usize, height: usize) -> Vec<Positio
     }
 
     if position.column < width - 1 {
-        
+        neighbors.push(Position::new(position.row, position.column + 1));
     }
 
     neighbors
 }
 
-fn find_shortest_path(vacancy_cache: &mut VacancyCache) -> usize {
+fn find_arrival_time(
+    vacancy_cache: &mut VacancyCache,
+    from: Position,
+    to: Position,
+    start_time: usize,
+) -> usize {
+    let width = vacancy_cache.width;
+    let height = vacancy_cache.height;
+
+    let mut visited = HashSet::new();
+
     let mut queue = BinaryHeap::new();
-    queue.push(State::new(Position::new(0, 0), 0));
+    queue.push(State::new(from, to, start_time));
 
     while let Some(state) = queue.pop() {
+        if visited.contains(&state) {
+            continue;
+        }
 
+        visited.insert(state);
+
+        let vacancies = vacancy_cache.get_vacancies(state.time + 1);
+
+        // Check neighbors
+        let neighbors = get_neighbors(state.current, width, height);
+        for neighbor in neighbors {
+            if neighbor == Position::new(height + 1, width - 1) {
+                return state.time + 1;
+            }
+
+            if vacancies.contains(&neighbor) {
+                queue.push(State::new(neighbor, state.destination, state.time + 1));
+            }
+        }
+
+        // Check staying in place
+        if vacancies.contains(&state.current) {
+            queue.push(State::new(state.current, state.destination, state.time + 1));
+        }
     }
+
+    unreachable!()
 }
 
 fn main() {
@@ -236,5 +261,11 @@ fn main() {
     let (blizzards, width, height) = parse_blizzards(lines);
     let mut vacancy_cache = VacancyCache::new(blizzards, width, height);
 
-    let shortest_path = find_shortest_path(&mut vacancy_cache);
+    let arrival_time = find_arrival_time(
+        &mut vacancy_cache,
+        Position::new(0, 0),
+        Position::new(height + 1, width - 1),
+        0,
+    );
+    println!("Shortest path: {arrival_time}");
 }
