@@ -5,7 +5,6 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     iter::Iterator,
-    usize,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
