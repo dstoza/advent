@@ -232,7 +232,7 @@ fn find_arrival_time(
         // Check neighbors
         let neighbors = get_neighbors(state.current, width, height);
         for neighbor in neighbors {
-            if neighbor == Position::new(height + 1, width - 1) {
+            if neighbor == state.destination {
                 return state.time + 1;
             }
 
@@ -261,11 +261,15 @@ fn main() {
     let (blizzards, width, height) = parse_blizzards(lines);
     let mut vacancy_cache = VacancyCache::new(blizzards, width, height);
 
-    let arrival_time = find_arrival_time(
-        &mut vacancy_cache,
-        Position::new(0, 0),
-        Position::new(height + 1, width - 1),
-        0,
-    );
-    println!("Shortest path: {arrival_time}");
+    let start = Position::new(0, 0);
+    let end = Position::new(height + 1, width - 1);
+
+    let initial_time = find_arrival_time(&mut vacancy_cache, start, end, 0);
+    println!("Initial time: {initial_time}");
+
+    let return_time = find_arrival_time(&mut vacancy_cache, end, start, initial_time);
+    println!("Return time: {return_time}");
+
+    let final_time = find_arrival_time(&mut vacancy_cache, start, end, return_time);
+    println!("Final time: {final_time}");
 }
