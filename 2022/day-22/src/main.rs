@@ -16,29 +16,29 @@ enum Turn {
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 enum Facing {
-    Right,
-    Down,
-    Left,
-    Up,
+    East,
+    South,
+    West,
+    North,
 }
 
 impl Facing {
     fn turn(self, turn: Turn) -> Self {
         match (self as u8 + turn as u8) % 4 {
-            0 => Self::Right,
-            1 => Self::Down,
-            2 => Self::Left,
-            3 => Self::Up,
+            0 => Self::East,
+            1 => Self::South,
+            2 => Self::West,
+            3 => Self::North,
             _ => unreachable!(),
         }
     }
 
     fn opposite(self) -> Self {
         match self {
-            Self::Right => Self::Left,
-            Self::Down => Self::Up,
-            Self::Left => Self::Right,
-            Self::Up => Self::Down,
+            Self::East => Self::West,
+            Self::South => Self::North,
+            Self::West => Self::East,
+            Self::North => Self::South,
         }
     }
 }
@@ -85,19 +85,19 @@ struct Position {
 impl Position {
     fn step(self, facing: Facing) -> Self {
         match facing {
-            Facing::Right => Self {
+            Facing::East => Self {
                 row: self.row,
                 column: self.column + 1,
             },
-            Facing::Down => Self {
+            Facing::South => Self {
                 row: self.row + 1,
                 column: self.column,
             },
-            Facing::Left => Self {
+            Facing::West => Self {
                 row: self.row,
                 column: self.column - 1,
             },
-            Facing::Up => Self {
+            Facing::North => Self {
                 row: self.row - 1,
                 column: self.column,
             },
@@ -167,7 +167,7 @@ fn run_commands(commands: &[Command], board: &[Vec<u8>]) {
 
     let column = board[1].iter().position(|b| *b == b'.').unwrap();
     let mut position = Position { row: 1, column };
-    let mut facing = Facing::Right;
+    let mut facing = Facing::East;
 
     for command in commands {
         match command {
