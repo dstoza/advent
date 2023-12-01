@@ -42,35 +42,23 @@ fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
 
-    let mut sum = 0;
-    for line in reader.lines().map(std::result::Result::unwrap) {
-        let mut first_index = line.len();
-        let mut first_value = None;
-        for (s, value) in DIGITS {
-            let index = line.find(s);
-            if let Some(index) = index {
-                if index < first_index {
-                    first_index = index;
-                    first_value = Some(value);
-                }
-            }
-        }
+    let sum: i32 = reader
+        .lines()
+        .map(std::result::Result::unwrap)
+        .map(|line| {
+            let matches = DIGITS
+                .iter()
+                .flat_map(|(pattern, value)| {
+                    line.match_indices(pattern)
+                        .map(|(index, _)| (index, *value))
+                })
+                .collect::<Vec<_>>();
 
-        let mut last_index = 0;
-        let mut last_value = None;
-        for (s, value) in DIGITS {
-            let index = line.rfind(s);
-            if let Some(index) = index {
-                if index >= last_index {
-                    last_index = index;
-                    last_value = Some(value);
-                }
-            }
-        }
-
-        let value = first_value.unwrap() * 10 + last_value.unwrap();
-        sum += value;
-    }
+            let first = matches.iter().min_by_key(|(index, _)| *index).unwrap().1;
+            let last = matches.iter().max_by_key(|(index, _)| *index).unwrap().1;
+            first * 10 + last
+        })
+        .sum();
 
     println!("{sum}");
 }
