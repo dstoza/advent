@@ -37,11 +37,8 @@ fn main() {
         for (column, byte) in chunk.iter().enumerate() {
             if byte.is_ascii_digit() {
                 if value.is_none() {
-                    for r in row - 1..=row + 1 {
-                        if is_symbol(board[r * width + column - 1]) {
-                            adjacent = true;
-                        }
-                    }
+                    adjacent |=
+                        (row - 1..=row + 1).any(|r| is_symbol(board[r * width + column - 1]));
                 }
 
                 if is_symbol(board[(row - 1) * width + column])
@@ -55,11 +52,7 @@ fn main() {
                     |value| value * 10 + u32::from(byte - b'0'),
                 ));
             } else if let Some(v) = value {
-                for r in row - 1..=row + 1 {
-                    if is_symbol(board[r * width + column]) {
-                        adjacent = true;
-                    }
-                }
+                adjacent |= (row - 1..=row + 1).any(|r| is_symbol(board[r * width + column]));
 
                 if adjacent {
                     sum += v;
