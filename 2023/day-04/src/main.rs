@@ -1,6 +1,6 @@
 #![warn(clippy::pedantic)]
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
     iter::Iterator,
@@ -34,7 +34,26 @@ fn main() {
         })
         .collect::<Vec<_>>();
 
-    let sum: u32 = matches.iter().map(|matches| (1u32 << matches) / 2).sum();
+    let points: u32 = matches.iter().map(|matches| (1u32 << matches) / 2).sum();
+    println!("{points}");
 
-    println!("{sum}");
+    let mut copies = VecDeque::new();
+    let copy_sum: u32 = matches
+        .iter()
+        .map(|count| {
+            let current_copies = 1 + copies.pop_front().unwrap_or(0);
+
+            if copies.len() < *count {
+                copies.resize(*count, 0);
+            }
+
+            for c in copies.iter_mut().take(*count) {
+                *c += current_copies;
+            }
+
+            current_copies
+        })
+        .sum();
+
+    println!("{copy_sum}");
 }
