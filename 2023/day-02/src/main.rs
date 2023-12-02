@@ -62,4 +62,21 @@ fn main() {
     }
 
     println!("{sum}");
+
+    let mut power_sum = 0;
+    for (_, game) in games.iter().enumerate() {
+        let mut minimums: HashMap<&String, i32> = HashMap::new();
+        for round in game {
+            for (color, count) in round {
+                minimums
+                    .entry(color)
+                    .and_modify(|value| *value = (*value).max(*count))
+                    .or_insert(*count);
+            }
+        }
+        let power: i32 = minimums.values().product();
+        power_sum += power;
+    }
+
+    println!("{power_sum}");
 }
