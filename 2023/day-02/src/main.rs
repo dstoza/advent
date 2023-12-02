@@ -6,14 +6,6 @@ use std::{
     iter::Iterator,
 };
 
-fn get_initial() -> HashMap<String, i32> {
-    HashMap::from([
-        (String::from("red"), 12),
-        (String::from("green"), 13),
-        (String::from("blue"), 14),
-    ])
-}
-
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -22,17 +14,16 @@ fn main() {
         .lines()
         .map(std::result::Result::unwrap)
         .map(|line| {
-            let split = line.split(": ");
+            let mut split = line.split(": ");
             let rounds = split
-                .skip(1)
-                .next()
+                .nth(1)
                 .unwrap()
                 .split("; ")
                 .map(|round| {
                     round
                         .split(", ")
                         .map(|turn| {
-                            let mut split = turn.split(" ");
+                            let mut split = turn.split(' ');
                             let count: i32 = split.next().unwrap().parse().unwrap();
                             let color = String::from(split.next().unwrap());
                             (color, count)
@@ -45,38 +36,43 @@ fn main() {
         })
         .collect::<Vec<_>>();
 
-    let initial = get_initial();
-    let mut sum = 0;
-    for (index, game) in games.iter().enumerate() {
-        let mut possible = true;
-        for round in game {
-            for (color, count) in round {
-                if *count > initial[color] {
-                    possible = false;
-                }
-            }
-        }
-        if possible {
-            sum += index + 1;
-        }
-    }
+    let initial = HashMap::from([
+        (String::from("red"), 12),
+        (String::from("green"), 13),
+        (String::from("blue"), 14),
+    ]);
 
-    println!("{sum}");
+    let possible_sum: usize = games
+        .iter()
+        .enumerate()
+        .map(|(index, game)| {
+            (index + 1)
+                * usize::from(
+                    game.iter()
+                        .flat_map(HashMap::iter)
+                        .all(|(color, count)| *count <= initial[color]),
+                )
+        })
+        .sum();
 
-    let mut power_sum = 0;
-    for (_, game) in games.iter().enumerate() {
-        let mut minimums: HashMap<&String, i32> = HashMap::new();
-        for round in game {
-            for (color, count) in round {
-                minimums
-                    .entry(color)
-                    .and_modify(|value| *value = (*value).max(*count))
-                    .or_insert(*count);
-            }
-        }
-        let power: i32 = minimums.values().product();
-        power_sum += power;
-    }
+    println!("{possible_sum}");
+
+    let power_sum: i32 = games
+        .iter()
+        .map(|game| {
+            game.iter()
+                .fold(HashMap::<&String, i32>::new(), |mut minimums, round| {
+                    for (color, count) in round {
+                        minimums
+                            .entry(color)
+                            .and_modify(|value| *value = (*value).max(*count))
+                            .or_insert(*count);
+                    }
+                    minimums
+                })
+        })
+        .map(|minimums| minimums.values().copied().product::<i32>())
+        .sum();
 
     println!("{power_sum}");
 }
