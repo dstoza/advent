@@ -60,16 +60,15 @@ fn main() {
     let power_sum: i32 = games
         .iter()
         .map(|game| {
-            game.iter()
-                .fold(HashMap::<&String, i32>::new(), |mut minimums, round| {
-                    for (color, count) in round {
-                        minimums
-                            .entry(color)
-                            .and_modify(|value| *value = (*value).max(*count))
-                            .or_insert(*count);
-                    }
+            game.iter().fold(HashMap::new(), |mut minimums, round| {
+                for (color, count) in round {
                     minimums
-                })
+                        .entry(color)
+                        .and_modify(|value: &mut i32| *value = (*value).max(*count))
+                        .or_insert(*count);
+                }
+                minimums
+            })
         })
         .map(|minimums| minimums.values().copied().product::<i32>())
         .sum();
