@@ -14,8 +14,8 @@ fn main() {
         .lines()
         .map(std::result::Result::unwrap)
         .map(|line| {
-            let mut split = line.split(": ");
-            let rounds = split
+            let rounds = line
+                .split(": ")
                 .nth(1)
                 .unwrap()
                 .split("; ")
