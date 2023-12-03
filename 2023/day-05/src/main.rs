@@ -22,6 +22,23 @@ impl Map {
             length: split.next().unwrap().parse().unwrap(),
         }
     }
+
+    fn try_map(&self, value: i64) -> Option<i64> {
+        if (self.source..self.source + self.length).contains(&value) {
+            Some(value + self.destination - self.source)
+        } else {
+            None
+        }
+    }
+}
+
+fn map_all(value: i64, maps: &[Map]) -> i64 {
+    for map in maps {
+        if let Some(result) = map.try_map(value) {
+            return result;
+        }
+    }
+    value
 }
 
 fn main() {
@@ -52,10 +69,19 @@ fn main() {
 
         current_maps.push(Map::parse(&line));
     }
-
     maps.push(current_maps);
 
-    for map in &maps {
-        println!("{map:?}");
-    }
+    let nearest = seeds
+        .iter()
+        .copied()
+        .map(|mut seed| {
+            for maps in &maps {
+                seed = map_all(seed, maps.as_slice());
+            }
+            seed
+        })
+        .min()
+        .unwrap();
+
+    println!("{nearest}");
 }
