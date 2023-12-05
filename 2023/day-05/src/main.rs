@@ -55,24 +55,21 @@ impl Map {
 
     fn map_ranges(&self, ranges: &mut Vec<Range<i64>>) -> Vec<Range<i64>> {
         let mut mapped = Vec::new();
-        let remainder = ranges
-            .iter()
-            .flat_map(|range| {
-                let (intersection, remainder) = intersect(range, self.source_range());
-                match intersection {
-                    Some(intersection) => {
-                        let start = intersection.start + self.offset();
-                        let length = intersection.end - intersection.start;
-                        mapped.push(start..start + length);
-                        remainder
-                    }
-                    None => vec![range.clone()],
+        let remainder = ranges.iter().flat_map(|range| {
+            let (intersection, remainder) = intersect(range, self.source_range());
+            match intersection {
+                Some(intersection) => {
+                    let start = intersection.start + self.offset();
+                    let length = intersection.end - intersection.start;
+                    mapped.push(start..start + length);
+                    remainder
                 }
-            })
-            .collect::<Vec<_>>();
+                None => vec![range.clone()],
+            }
+        });
 
         // Preserve the remainder in the input for future maps
-        *ranges = remainder;
+        *ranges = Vec::from_iter(remainder);
 
         mapped
     }
