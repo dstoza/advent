@@ -1,10 +1,32 @@
 #![warn(clippy::pedantic)]
 use std::{
-    collections::{HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
     iter::Iterator,
+    ops::Range,
 };
+
+fn intersect(a: &Range<i64>, b: Range<i64>) -> (Option<Range<i64>>, Vec<Range<i64>>) {
+    if b.end <= a.start || b.start >= a.end {
+        (None, vec![a.clone()])
+    } else {
+        let intersection = a.start.max(b.start)..a.end.min(b.end);
+
+        let mut remainder = Vec::new();
+
+        let beginning = a.start..b.start;
+        if !beginning.is_empty() {
+            remainder.push(beginning);
+        }
+
+        let end = b.end..a.end;
+        if !end.is_empty() {
+            remainder.push(end)
+        }
+
+        (Some(intersection), remainder)
+    }
+}
 
 #[derive(Clone, Debug)]
 struct Map {
@@ -23,22 +45,64 @@ impl Map {
         }
     }
 
+    fn source_range(&self) -> Range<i64> {
+        self.source..self.source + self.length
+    }
+
+    fn offset(&self) -> i64 {
+        self.destination - self.source
+    }
+
     fn try_map(&self, value: i64) -> Option<i64> {
-        if (self.source..self.source + self.length).contains(&value) {
-            Some(value + self.destination - self.source)
+        if self.source_range().contains(&value) {
+            Some(value + self.offset())
         } else {
             None
         }
     }
+
+    fn map_ranges(&self, ranges: &mut Vec<Range<i64>>) -> Vec<Range<i64>> {
+        let mut mapped = Vec::new();
+        let remainder = ranges
+            .iter()
+            .flat_map(|range| {
+                let (intersection, remainder) = intersect(range, self.source_range());
+                match intersection {
+                    Some(intersection) => {
+                        let start = intersection.start + self.offset();
+                        let length = intersection.end - intersection.start;
+                        mapped.push(start..start + length);
+                        remainder
+                    }
+                    None => vec![range.clone()],
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Preserve the remainder in the input for future maps
+        *ranges = remainder;
+
+        mapped
+    }
 }
 
-fn map_all(value: i64, maps: &[Map]) -> i64 {
-    for map in maps {
+fn map_all(value: i64, map_set: &[Map]) -> i64 {
+    for map in map_set {
         if let Some(result) = map.try_map(value) {
             return result;
         }
     }
     value
+}
+
+fn map_ranges(mut ranges: Vec<Range<i64>>, map_sets: &[Map]) -> Vec<Range<i64>> {
+    let mut mapped = Vec::new();
+    for map_set in map_sets {
+        mapped.append(&mut map_set.map_ranges(&mut ranges));
+    }
+    // Pass through anything that wasn't mapped
+    mapped.append(&mut ranges);
+    mapped
 }
 
 fn main() {
@@ -55,33 +119,53 @@ fn main() {
         .map(|seed| seed.parse::<i64>().unwrap())
         .collect::<Vec<_>>();
 
-    let mut maps = Vec::new();
-    let mut current_maps = Vec::new();
+    let mut map_sets = Vec::new();
+    let mut current_set = Vec::new();
     while let Some(line) = lines.next() {
         if line.is_empty() {
-            if !current_maps.is_empty() {
-                maps.push(current_maps.clone());
-                current_maps.clear();
+            if !current_set.is_empty() {
+                map_sets.push(current_set.clone());
+                current_set.clear();
             }
             lines.next().unwrap();
             continue;
         }
 
-        current_maps.push(Map::parse(&line));
+        current_set.push(Map::parse(&line));
     }
-    maps.push(current_maps);
+    map_sets.push(current_set);
 
-    let nearest = seeds
+    let nearest_as_individual = seeds
         .iter()
         .copied()
         .map(|mut seed| {
-            for maps in &maps {
-                seed = map_all(seed, maps.as_slice());
+            for map_set in &map_sets {
+                seed = map_all(seed, map_set.as_slice());
             }
             seed
         })
         .min()
         .unwrap();
 
-    println!("{nearest}");
+    println!("{nearest_as_individual}");
+
+    let seed_ranges = seeds
+        .chunks(2)
+        .map(|chunk| chunk[0]..chunk[0] + chunk[1])
+        .collect::<Vec<_>>();
+
+    let nearest_as_ranges = seed_ranges
+        .into_iter()
+        .flat_map(|range| {
+            let mut ranges = vec![range];
+            for map_set in &map_sets {
+                ranges = map_ranges(ranges, map_set.as_slice());
+            }
+            ranges
+        })
+        .map(|range| range.start)
+        .min()
+        .unwrap();
+
+    println!("{nearest_as_ranges}");
 }
