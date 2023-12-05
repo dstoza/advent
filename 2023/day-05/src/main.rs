@@ -53,14 +53,6 @@ impl Map {
         self.destination - self.source
     }
 
-    fn try_map(&self, value: i64) -> Option<i64> {
-        if self.source_range().contains(&value) {
-            Some(value + self.offset())
-        } else {
-            None
-        }
-    }
-
     fn map_ranges(&self, ranges: &mut Vec<Range<i64>>) -> Vec<Range<i64>> {
         let mut mapped = Vec::new();
         let remainder = ranges
@@ -84,15 +76,6 @@ impl Map {
 
         mapped
     }
-}
-
-fn map_all(value: i64, map_set: &[Map]) -> i64 {
-    for map in map_set {
-        if let Some(result) = map.try_map(value) {
-            return result;
-        }
-    }
-    value
 }
 
 fn map_ranges(mut ranges: Vec<Range<i64>>, map_sets: &[Map]) -> Vec<Range<i64>> {
@@ -137,25 +120,22 @@ fn main() {
 
     let nearest_as_individual = seeds
         .iter()
-        .copied()
-        .map(|mut seed| {
+        .flat_map(|seed| {
+            let mut ranges = vec![*seed..*seed + 1];
             for map_set in &map_sets {
-                seed = map_all(seed, map_set.as_slice());
+                ranges = map_ranges(ranges, map_set.as_slice());
             }
-            seed
+            ranges
         })
+        .map(|range| range.start)
         .min()
         .unwrap();
 
     println!("{nearest_as_individual}");
 
-    let seed_ranges = seeds
+    let nearest_as_ranges = seeds
         .chunks(2)
         .map(|chunk| chunk[0]..chunk[0] + chunk[1])
-        .collect::<Vec<_>>();
-
-    let nearest_as_ranges = seed_ranges
-        .into_iter()
         .flat_map(|range| {
             let mut ranges = vec![range];
             for map_set in &map_sets {
