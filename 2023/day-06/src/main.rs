@@ -5,6 +5,16 @@ use std::{
     iter::Iterator,
 };
 
+fn count_winners(time: u64, distance: u64) -> u64 {
+    for hold in 0..time {
+        let d = hold * (time - hold);
+        if d > distance {
+            return time + 1 - hold * 2;
+        }
+    }
+    0
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -15,7 +25,7 @@ fn main() {
         .strip_prefix("Time:")
         .unwrap()
         .split_whitespace()
-        .map(|time| time.parse::<u32>().unwrap())
+        .map(|time| time.parse::<u64>().unwrap())
         .collect::<Vec<_>>();
     let distances = lines
         .next()
@@ -23,18 +33,13 @@ fn main() {
         .strip_prefix("Distance:")
         .unwrap()
         .split_whitespace()
-        .map(|time| time.parse::<u32>().unwrap())
+        .map(|time| time.parse::<u64>().unwrap())
         .collect::<Vec<_>>();
 
-    let error_margin: usize = times
+    let error_margin: u64 = times
         .iter()
         .zip(distances.iter())
-        .map(|(time, distance)| {
-            (0..*time)
-                .map(|hold| hold * (*time - hold))
-                .filter(|d| *d > *distance)
-                .count()
-        })
+        .map(|(time, distance)| count_winners(*time, *distance))
         .product();
 
     println!("{error_margin}");
@@ -59,10 +64,5 @@ fn main() {
         .parse::<u64>()
         .unwrap();
 
-    let longer = (0..time)
-        .map(|hold| hold * (time - hold))
-        .filter(|d| *d > distance)
-        .count();
-
-    println!("{longer}");
+    println!("{}", count_winners(time, distance));
 }
