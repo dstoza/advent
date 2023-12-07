@@ -117,7 +117,7 @@ fn find_eligible_neighbors(grid: &[Vec<u8>], start: Coordinates) -> Vec<Directio
         .collect()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct PipeIterator<'a> {
     grid: &'a [Vec<u8>],
     next: Coordinates,
@@ -195,7 +195,7 @@ fn main() {
         })
         .collect::<Vec<_>>();
 
-    let iterator = iterators[0].zip(iterators[1]);
+    let iterator = iterators[0].clone().zip(iterators[1].clone());
 
     let mut steps = 0;
     let mut visited = HashSet::new();
