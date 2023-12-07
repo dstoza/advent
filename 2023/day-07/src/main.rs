@@ -9,6 +9,8 @@ use std::{
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum Label {
+    #[cfg(feature = "joker")]
+    Joker,
     Two,
     Three,
     Four,
@@ -18,6 +20,7 @@ enum Label {
     Eight,
     Nine,
     Ten,
+    #[cfg(not(feature = "joker"))]
     Jack,
     Queen,
     King,
@@ -27,6 +30,8 @@ enum Label {
 impl Label {
     fn parse(b: u8) -> Self {
         match b {
+            #[cfg(feature = "joker")]
+            b'J' => Self::Joker,
             b'2' => Self::Two,
             b'3' => Self::Three,
             b'4' => Self::Four,
@@ -36,6 +41,7 @@ impl Label {
             b'8' => Self::Eight,
             b'9' => Self::Nine,
             b'T' => Self::Ten,
+            #[cfg(not(feature = "joker"))]
             b'J' => Self::Jack,
             b'Q' => Self::Queen,
             b'K' => Self::King,
@@ -61,22 +67,35 @@ struct Hand([Label; 5]);
 
 impl Hand {
     fn count_labels(self) -> (usize, usize) {
+        #[cfg(feature = "joker")]
+        let mut jokers = 0;
+
         let mut label_counts = HashMap::new();
         for card in self.0 {
+            #[cfg(feature = "joker")]
+            if card == Label::Joker {
+                jokers += 1;
+                continue;
+            }
+
             label_counts
                 .entry(card)
                 .and_modify(|count: &mut usize| *count += 1)
                 .or_insert(1);
         }
         let distinct_labels = label_counts.keys().count();
-        let max_label = label_counts.values().max().copied().unwrap();
+        let max_label = label_counts.values().max().copied().unwrap_or_default();
+
+        #[cfg(feature = "joker")]
+        let max_label = max_label + jokers;
+
         (distinct_labels, max_label)
     }
 
     fn get_type(self) -> Type {
         let (distinct_labels, max_label) = self.count_labels();
         match (distinct_labels, max_label) {
-            (1, _) => Type::FiveOfAKind,
+            (_, 5) => Type::FiveOfAKind,
             (2, 4) => Type::FourOfAKind,
             (2, 3) => Type::FullHouse,
             (3, 3) => Type::ThreeOfAKind,
@@ -144,6 +163,7 @@ fn main() {
 
     hands.sort_unstable_by_key(|(hand, _)| *hand);
 
+    #[allow(clippy::cast_possible_truncation)]
     let winnings: u32 = hands
         .iter()
         .enumerate()
