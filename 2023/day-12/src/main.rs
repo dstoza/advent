@@ -1,3 +1,4 @@
+#![feature(iter_intersperse)]
 #![warn(clippy::pedantic)]
 use std::{
     collections::HashMap,
@@ -7,21 +8,18 @@ use std::{
 
 use smallvec::SmallVec;
 
-type SegmentsKey = (Vec<Vec<u8>>, SmallVec<[u8; 32]>);
-type SegmentKey = (SmallVec<[u8; 32]>, SmallVec<[u8; 32]>);
+type Key = SmallVec<[u8; 64]>;
 
 #[derive(Default)]
 struct Cache {
-    segments_data: HashMap<SegmentsKey, usize>,
-    segment_data: HashMap<SegmentKey, usize>,
+    data: HashMap<Key, usize>,
     hits: usize,
     misses: usize,
-    count_arrangement_calls: usize,
 }
 
 impl Cache {
-    fn get_segments(&mut self, key: &SegmentsKey) -> Option<usize> {
-        if let Some(value) = self.segments_data.get(key) {
+    fn get(&mut self, key: &Key) -> Option<usize> {
+        if let Some(value) = self.data.get(key) {
             self.hits += 1;
             Some(*value)
         } else {
@@ -30,43 +28,31 @@ impl Cache {
         }
     }
 
-    fn insert_segments(&mut self, key: SegmentsKey, value: usize) {
-        self.segments_data.insert(key, value);
-    }
-
-    fn get_segment(&mut self, key: &SegmentKey) -> Option<usize> {
-        if let Some(value) = self.segment_data.get(key) {
-            self.hits += 1;
-            Some(*value)
-        } else {
-            self.misses += 1;
-            None
-        }
-    }
-
-    fn insert_segment(&mut self, key: SegmentKey, value: usize) {
-        self.segment_data.insert(key, value);
+    fn insert(&mut self, key: Key, value: usize) {
+        self.data.insert(key, value);
     }
 }
 
 fn count_segment_arrangements(segment: &[u8], lengths: &[u8], cache: &mut Cache) -> usize {
-    let key = (SmallVec::from(segment), SmallVec::from(lengths));
-    if let Some(arrangements) = cache.get_segment(&key) {
+    let mut key = SmallVec::from(segment);
+    key.push(b' ');
+    key.extend_from_slice(lengths);
+    if let Some(arrangements) = cache.get(&key) {
         return arrangements;
     }
 
     if segment.iter().any(|b| *b == b'#') && lengths.is_empty() {
-        cache.insert_segment(key, 0);
+        cache.insert(key, 0);
         return 0;
     }
 
     if lengths.is_empty() {
-        cache.insert_segment(key, 1);
+        cache.insert(key, 1);
         return 1;
     }
 
     if usize::from(lengths.iter().copied().sum::<u8>()) + lengths.len() - 1 > segment.len() {
-        cache.insert_segment(key, 0);
+        cache.insert(key, 0);
         return 0;
     }
 
@@ -92,20 +78,25 @@ fn count_segment_arrangements(segment: &[u8], lengths: &[u8], cache: &mut Cache)
         .collect::<Vec<_>>();
 
     let sum = arrangements.iter().sum();
-    cache.insert_segment(key, sum);
+    cache.insert(key, sum);
     sum
 }
 
 fn count_arrangements(segments: &[Vec<u8>], lengths: &[u8], cache: &mut Cache) -> usize {
-    let key = (segments.to_vec(), SmallVec::from(lengths));
-    if let Some(arrangements) = cache.get_segments(&key) {
+    let key = segments
+        .iter()
+        .map(std::vec::Vec::as_slice)
+        .collect::<Vec<_>>();
+    let key = key.as_slice().join(&b'.');
+    let mut key = SmallVec::from(key);
+    key.push(b' ');
+    key.extend_from_slice(lengths);
+    if let Some(arrangements) = cache.get(&key) {
         return arrangements;
     }
 
     if segments.len() == 1 {
         let count = count_segment_arrangements(&segments[0], lengths, cache);
-        // println!("returning {count}");
-        cache.insert_segments(key, count);
         return count;
     }
 
@@ -123,7 +114,7 @@ fn count_arrangements(segments: &[Vec<u8>], lengths: &[u8], cache: &mut Cache) -
             arrangements * count_arrangements(&segments[1..], &lengths[taken_lengths..], cache);
     }
 
-    cache.insert_segments(key, count);
+    cache.insert(key, count);
     count
 }
 
@@ -171,4 +162,5 @@ fn main() {
         .sum();
 
     println!("{sum}");
+    println!("hits {} misses {}", cache.hits, cache.misses);
 }
