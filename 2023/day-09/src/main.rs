@@ -5,27 +5,21 @@ use std::{
     iter::Iterator,
 };
 
-fn differences(sequence: &[i64]) -> Vec<i64> {
-    sequence
+fn extrapolate(sequence: &[i64]) -> (i64, i64) {
+    if sequence.iter().all(|x| *x == 0) {
+        return (0, 0);
+    }
+
+    let differences = sequence
         .windows(2)
         .map(|window| window[1] - window[0])
-        .collect::<Vec<_>>()
-}
+        .collect::<Vec<_>>();
 
-fn get_next(sequence: &[i64]) -> i64 {
-    if sequence.iter().all(|x| *x == 0) {
-        return 0;
-    }
-
-    sequence.last().unwrap() + get_next(&differences(sequence))
-}
-
-fn get_previous(sequence: &[i64]) -> i64 {
-    if sequence.iter().all(|x| *x == 0) {
-        return 0;
-    }
-
-    sequence.first().unwrap() - get_previous(&differences(sequence))
+    let (next, previous) = extrapolate(&differences);
+    (
+        sequence.last().unwrap() + next,
+        sequence.first().unwrap() - previous,
+    )
 }
 
 fn main() {
@@ -40,7 +34,7 @@ fn main() {
                 .split_whitespace()
                 .map(|s| s.parse::<i64>().unwrap())
                 .collect::<Vec<_>>();
-            (get_next(&sequence), get_previous(&sequence))
+            extrapolate(&sequence)
         })
         .reduce(|(next_sum, previous_sum), (next, previous)| {
             (next_sum + next, previous_sum + previous)
