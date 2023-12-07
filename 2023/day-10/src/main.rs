@@ -233,13 +233,16 @@ impl<'a> Iterator for PipeIterator<'a> {
     }
 }
 
-fn maybe_set(mut grid: &mut [Vec<u8>], coordinates: Option<Coordinates>, value: u8) {
+fn maybe_set(mut grid: &mut [Vec<u8>], coordinates: Option<Coordinates>, value: u8) -> bool {
     let Some(coordinates) = coordinates else {
-        return;
+        return false;
     };
 
     if let Some(b'.') = grid.at(coordinates) {
         grid.set(coordinates, value);
+        true
+    } else {
+        false
     }
 }
 
@@ -260,17 +263,17 @@ fn fill_tracker(mut grid: &mut [Vec<u8>], coordinates: Coordinates, value: u8, f
     }
 }
 
-fn expand(tracker: &mut [Vec<u8>]) {
-    for row in 0..tracker.len() {
-        for column in 0..tracker[0].len() {
-            let coordinates = Coordinates::new(row, column);
-            let value = tracker.at(coordinates).unwrap();
-            if value == b'L' || value == b'R' {
-                maybe_set(tracker, coordinates.step(Direction::North), value);
-                maybe_set(tracker, coordinates.step(Direction::East), value);
-                maybe_set(tracker, coordinates.step(Direction::South), value);
-                maybe_set(tracker, coordinates.step(Direction::West), value);
-            }
+fn flood_fill(tracker: &mut [Vec<u8>], start: Coordinates) {
+    let value = tracker.at(start).unwrap();
+    for direction in [
+        Direction::North,
+        Direction::East,
+        Direction::South,
+        Direction::West,
+    ] {
+        let neighbor = start.step(direction);
+        if maybe_set(tracker, neighbor, value) {
+            flood_fill(tracker, neighbor.unwrap());
         }
     }
 }
@@ -278,11 +281,18 @@ fn expand(tracker: &mut [Vec<u8>]) {
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-    let grid = reader
+    let mut grid = reader
         .lines()
         .map(std::result::Result::unwrap)
-        .map(std::string::String::into_bytes)
+        .map(|line| {
+            let mut line = line.into_bytes();
+            line.insert(0, b'.');
+            line.push(b'.');
+            line
+        })
         .collect::<Vec<_>>();
+    grid.insert(0, vec![b'.'; grid[0].len()]);
+    grid.push(vec![b'.'; grid[0].len()]);
 
     let start = find_start(&grid).unwrap();
     let eligible_neighbors = find_eligible_neighbors(&grid, start);
@@ -323,28 +333,28 @@ fn main() {
         );
     }
 
-    // for line in &tracker {
-    //     for byte in line {
-    //         print!("{}", *byte as char);
-    //     }
-    //     println!();
-    // }
-
-    for _ in 0..10 {
-        expand(&mut tracker);
+    for row in 0..tracker.len() {
+        for column in 0..tracker[0].len() {
+            let coordinates = Coordinates::new(row, column);
+            if let Some(value) = tracker.as_slice().at(coordinates) {
+                if value == b'L' || value == b'R' {
+                    flood_fill(tracker.as_mut_slice(), coordinates);
+                }
+            }
+        }
     }
 
-    // for line in &tracker {
-    //     for byte in line {
-    //         print!("{}", *byte as char);
-    //     }
-    //     println!();
-    // }
-
-    let inside = tracker
+    let outside = tracker[0][0];
+    let inside = match outside {
+        b'L' => b'R',
+        b'R' => b'L',
+        _ => unreachable!(),
+    };
+    let inside_count = tracker
         .iter()
         .flat_map(|line| line.iter())
-        .filter(|b| **b == b'L')
+        .filter(|b| **b == inside)
         .count();
-    println!("{inside}");
+
+    println!("{inside_count}");
 }
