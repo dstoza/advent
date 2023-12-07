@@ -208,18 +208,15 @@ impl<'a> Iterator for PipeIterator<'a> {
     fn next(&mut self) -> Option<(Coordinates, Direction)> {
         let next = self.next;
         let from = self.from;
-        let Some(value) = self.grid.at(self.next) else {
-            return None;
-        };
-        let Some(direction) = pipe_direction(value, self.from) else {
-            return None;
-        };
-        let Some(new_next) = next.step(direction) else {
-            return None;
-        };
-        self.next = new_next;
-        self.from = direction.opposite();
-        Some((next, from))
+        self.grid
+            .at(self.next)
+            .and_then(|value| pipe_direction(value, self.from))
+            .and_then(|direction| next.step(direction).map(|new_next| (new_next, direction)))
+            .map(|(new_next, direction)| {
+                self.next = new_next;
+                self.from = direction.opposite();
+                (next, from)
+            })
     }
 }
 
@@ -246,6 +243,7 @@ fn fill_tracker(mut grid: &mut [Vec<u8>], coordinates: Coordinates, value: u8, f
         maybe_set(grid, coordinates.step(direction), b'L');
         direction = direction.next();
     }
+
     direction = direction.next();
     while direction != from {
         maybe_set(grid, coordinates.step(direction), b'R');
