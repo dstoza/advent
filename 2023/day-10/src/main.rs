@@ -23,18 +23,12 @@ impl Direction {
         [Self::North, Self::East, Self::South, Self::West]
     }
 
-    fn opposite(self) -> Self {
-        match self {
-            Self::North => Self::South,
-            Self::East => Self::West,
-            Self::South => Self::North,
-            Self::West => Self::East,
-            _ => unimplemented!(),
-        }
-    }
-
     fn next(self) -> Self {
         ((self as u8 + 1) % 8).into()
+    }
+
+    fn opposite(self) -> Self {
+        ((self as u8 + 4) % 8).into()
     }
 }
 
