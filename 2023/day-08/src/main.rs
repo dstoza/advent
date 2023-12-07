@@ -56,8 +56,6 @@ fn main() {
         .collect::<Vec<_>>();
     lines.next();
 
-    println!("directions {}", directions.len());
-
     let map = lines
         .map(|line| {
             let mut split = line.split(" = ");
@@ -84,50 +82,33 @@ fn main() {
 
     println!("{steps}");
 
-    for start in map.keys().filter(|key| key.as_bytes()[2] == b'A') {
-        println!("{start}");
-
-        let mut steps = 0;
-        let mut direction = directions.iter().cycle();
-        let mut current = start.clone();
-        while !current.ends_with('Z') {
-            steps += 1;
-            match direction.next().unwrap() {
-                Direction::Left => {
-                    current = map[&current].left.clone();
-                }
-                Direction::Right => {
-                    current = map[&current].right.clone();
-                }
+    let ghost_steps = map
+        .keys()
+        .filter_map(|key| {
+            if key.as_bytes()[2] != b'A' {
+                return None;
             }
-        }
 
-        let first = steps;
-
-        match direction.next().unwrap() {
-            Direction::Left => {
-                current = map[&current].left.clone();
-            }
-            Direction::Right => {
-                current = map[&current].right.clone();
-            }
-        }
-        steps += 1;
-        
-        while !current.ends_with('Z') {
-            steps += 1;
-            match direction.next().unwrap() {
-                Direction::Left => {
-                    current = map[&current].left.clone();
-                }
-                Direction::Right => {
-                    current = map[&current].right.clone();
+            let mut steps = 0;
+            let mut direction = directions.iter().cycle();
+            let mut current = key.clone();
+            while !current.ends_with('Z') {
+                steps += 1;
+                match direction.next().unwrap() {
+                    Direction::Left => {
+                        current = map[&current].left.clone();
+                    }
+                    Direction::Right => {
+                        current = map[&current].right.clone();
+                    }
                 }
             }
-        }
 
-        let cycle_length = steps - first;
+            assert!(steps % directions.len() == 0);
+            Some(steps / directions.len())
+        })
+        .product::<usize>()
+        * directions.len();
 
-        println!("{first} {cycle_length}");
-    }
+    println!("{ghost_steps}");
 }
