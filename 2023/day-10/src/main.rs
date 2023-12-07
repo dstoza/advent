@@ -6,20 +6,20 @@ use std::{
     iter::Iterator,
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Direction {
-    North,
-    NorthEast,
-    East,
-    SouthEast,
-    South,
-    SouthWest,
-    West,
-    NorthWest,
+    North = 0,
+    NorthEast = 1,
+    East = 2,
+    SouthEast = 3,
+    South = 4,
+    SouthWest = 5,
+    West = 6,
+    NorthWest = 7,
 }
 
 impl Direction {
-    fn all() -> [Self; 4] {
+    fn cardinal() -> [Self; 4] {
         [Self::North, Self::East, Self::South, Self::West]
     }
 
@@ -30,6 +30,26 @@ impl Direction {
             Self::South => Self::North,
             Self::West => Self::East,
             _ => unimplemented!(),
+        }
+    }
+
+    fn next(self) -> Self {
+        ((self as u8 + 1) % 8).into()
+    }
+}
+
+impl From<u8> for Direction {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Direction::North,
+            1 => Direction::NorthEast,
+            2 => Direction::East,
+            3 => Direction::SouthEast,
+            4 => Direction::South,
+            5 => Direction::SouthWest,
+            6 => Direction::West,
+            7 => Direction::NorthWest,
+            _ => unreachable!(),
         }
     }
 }
@@ -132,20 +152,28 @@ fn find_start(grid: &[Vec<u8>]) -> Option<Coordinates> {
     None
 }
 
+fn get_connections(value: u8) -> Option<[Direction; 2]> {
+    match value {
+        b'|' => Some([Direction::North, Direction::South]),
+        b'-' => Some([Direction::West, Direction::East]),
+        b'L' => Some([Direction::North, Direction::East]),
+        b'J' => Some([Direction::North, Direction::West]),
+        b'7' => Some([Direction::West, Direction::South]),
+        b'F' => Some([Direction::East, Direction::South]),
+        _ => None,
+    }
+}
+
 fn can_enter(value: u8, from: Direction) -> bool {
-    matches!(
-        (value, from),
-        (b'|', Direction::North | Direction::South)
-            | (b'-', Direction::West | Direction::East)
-            | (b'L', Direction::North | Direction::East)
-            | (b'J', Direction::North | Direction::West)
-            | (b'7', Direction::West | Direction::South)
-            | (b'F', Direction::East | Direction::South)
-    )
+    let Some(connections) = get_connections(value) else {
+        return false;
+    };
+
+    connections.into_iter().any(|direction| direction == from)
 }
 
 fn find_eligible_neighbors(grid: &[Vec<u8>], start: Coordinates) -> Vec<Direction> {
-    Direction::all()
+    Direction::cardinal()
         .iter()
         .filter_map(|direction| {
             if let Some((value, from)) = start
@@ -180,21 +208,8 @@ impl<'a> PipeIterator<'a> {
 }
 
 fn pipe_direction(value: u8, from: Direction) -> Option<Direction> {
-    match (value, from) {
-        (b'|', Direction::North) | (b'7', Direction::West) | (b'F', Direction::East) => {
-            Some(Direction::South)
-        }
-        (b'|', Direction::South) | (b'L', Direction::East) | (b'J', Direction::West) => {
-            Some(Direction::North)
-        }
-        (b'-', Direction::West) | (b'L', Direction::North) | (b'F', Direction::South) => {
-            Some(Direction::East)
-        }
-        (b'-', Direction::East) | (b'J', Direction::North) | (b'7', Direction::South) => {
-            Some(Direction::West)
-        }
-        _ => None,
-    }
+    get_connections(value)
+        .and_then(|connections| connections.into_iter().find(|direction| *direction != from))
 }
 
 impl<'a> Iterator for PipeIterator<'a> {
@@ -231,102 +246,17 @@ fn maybe_set(mut grid: &mut [Vec<u8>], coordinates: Option<Coordinates>, value: 
 fn fill_tracker(mut grid: &mut [Vec<u8>], coordinates: Coordinates, value: u8, from: Direction) {
     grid.set(coordinates, b'*');
 
-    match value {
-        b'|' => {
-            let (a, b) = match from {
-                Direction::North => (b'L', b'R'),
-                Direction::South => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            for direction in [Direction::NorthEast, Direction::East, Direction::SouthEast] {
-                maybe_set(grid, coordinates.step(direction), a);
-            }
-            for direction in [Direction::NorthWest, Direction::West, Direction::SouthWest] {
-                maybe_set(grid, coordinates.step(direction), b);
-            }
-        }
-        b'-' => {
-            let (a, b) = match from {
-                Direction::West => (b'L', b'R'),
-                Direction::East => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            for direction in [Direction::NorthWest, Direction::North, Direction::NorthEast] {
-                maybe_set(grid, coordinates.step(direction), a);
-            }
-            for direction in [Direction::SouthWest, Direction::South, Direction::SouthEast] {
-                maybe_set(grid, coordinates.step(direction), b);
-            }
-        }
-        b'L' => {
-            let (a, b) = match from {
-                Direction::North => (b'L', b'R'),
-                Direction::East => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            maybe_set(grid, coordinates.step(Direction::NorthEast), a);
-            for direction in [
-                Direction::SouthEast,
-                Direction::South,
-                Direction::SouthWest,
-                Direction::West,
-                Direction::NorthWest,
-            ] {
-                maybe_set(grid, coordinates.step(direction), b);
-            }
-        }
-        b'J' => {
-            let (a, b) = match from {
-                Direction::North => (b'L', b'R'),
-                Direction::West => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            for direction in [
-                Direction::NorthEast,
-                Direction::East,
-                Direction::SouthEast,
-                Direction::South,
-                Direction::SouthWest,
-            ] {
-                maybe_set(grid, coordinates.step(direction), a);
-            }
-            maybe_set(grid, coordinates.step(Direction::NorthWest), b);
-        }
-        b'7' => {
-            let (a, b) = match from {
-                Direction::West => (b'L', b'R'),
-                Direction::South => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            for direction in [
-                Direction::NorthWest,
-                Direction::North,
-                Direction::NorthEast,
-                Direction::East,
-                Direction::SouthEast,
-            ] {
-                maybe_set(grid, coordinates.step(direction), a);
-            }
-            maybe_set(grid, coordinates.step(Direction::SouthWest), b);
-        }
-        b'F' => {
-            let (a, b) = match from {
-                Direction::East => (b'L', b'R'),
-                Direction::South => (b'R', b'L'),
-                _ => unreachable!(),
-            };
-            maybe_set(grid, coordinates.step(Direction::SouthEast), a);
-            for direction in [
-                Direction::SouthWest,
-                Direction::West,
-                Direction::NorthWest,
-                Direction::North,
-                Direction::NorthEast,
-            ] {
-                maybe_set(grid, coordinates.step(direction), b);
-            }
-        }
-        _ => (),
+    let to = pipe_direction(value, from).unwrap();
+
+    let mut direction = from.next();
+    while direction != to {
+        maybe_set(grid, coordinates.step(direction), b'L');
+        direction = direction.next();
+    }
+    direction = direction.next();
+    while direction != from {
+        maybe_set(grid, coordinates.step(direction), b'R');
+        direction = direction.next();
     }
 }
 
