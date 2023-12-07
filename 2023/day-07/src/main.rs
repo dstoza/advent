@@ -123,17 +123,9 @@ impl PartialOrd for Hand {
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_type = self.get_type();
-        let other_type = other.get_type();
-        if self_type == other_type {
-            for (s, o) in self.0.iter().zip(other.0.iter()) {
-                if s != o {
-                    return s.cmp(o);
-                }
-            }
-            Ordering::Equal
-        } else {
-            self_type.cmp(&other_type)
+        match self.get_type().cmp(&other.get_type()) {
+            Ordering::Equal => self.0.cmp(&other.0),
+            o => o,
         }
     }
 }
