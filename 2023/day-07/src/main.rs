@@ -1,6 +1,5 @@
 #![warn(clippy::pedantic)]
 use std::{
-    cmp::{Ord, Ordering},
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
@@ -51,7 +50,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Type {
     HighCard,
     OnePair,
@@ -62,16 +61,19 @@ enum Type {
     FiveOfAKind,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Hand([Label; 5]);
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct Hand {
+    type_: Type,
+    cards: [Label; 5],
+}
 
 impl Hand {
-    fn count_labels(self) -> (usize, usize) {
+    fn count_labels(cards: [Label; 5]) -> (usize, usize) {
         #[cfg(feature = "joker")]
         let mut jokers = 0;
 
         let mut label_counts = HashMap::new();
-        for card in self.0 {
+        for card in cards {
             #[cfg(feature = "joker")]
             if card == Label::Joker {
                 jokers += 1;
@@ -92,8 +94,8 @@ impl Hand {
         (distinct_labels, max_label)
     }
 
-    fn get_type(self) -> Type {
-        let (distinct_labels, max_label) = self.count_labels();
+    fn get_type(cards: [Label; 5]) -> Type {
+        let (distinct_labels, max_label) = Self::count_labels(cards);
         match (distinct_labels, max_label) {
             (_, 5) => Type::FiveOfAKind,
             (2, 4) => Type::FourOfAKind,
@@ -105,27 +107,11 @@ impl Hand {
             _ => unreachable!(),
         }
     }
-}
 
-impl PartialEq for Hand {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for Hand {}
-
-impl PartialOrd for Hand {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Hand {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.get_type().cmp(&other.get_type()) {
-            Ordering::Equal => self.0.cmp(&other.0),
-            o => o,
+    fn new(cards: [Label; 5]) -> Self {
+        Self {
+            type_: Self::get_type(cards),
+            cards,
         }
     }
 }
@@ -147,7 +133,7 @@ fn main() {
                 .map(|b| Label::parse(*b))
                 .collect::<Vec<_>>();
             let hand: [Label; 5] = hand.as_slice().try_into().unwrap();
-            let hand = Hand(hand);
+            let hand = Hand::new(hand);
             let bid: u32 = split.next().unwrap().parse().unwrap();
             (hand, bid)
         })
