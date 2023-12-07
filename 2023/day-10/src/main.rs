@@ -66,46 +66,35 @@ impl Coordinates {
     }
 
     fn step(&self, direction: Direction) -> Option<Self> {
-        match direction {
-            Direction::North => {
+        let Some(row) = (match direction {
+            Direction::NorthWest | Direction::North | Direction::NorthEast => {
                 if self.row > 0 {
-                    Some(Coordinates::new(self.row - 1, self.column))
+                    Some(self.row - 1)
                 } else {
                     None
                 }
             }
-            Direction::NorthEast => {
-                if self.row > 0 {
-                    Some(Coordinates::new(self.row - 1, self.column + 1))
-                } else {
-                    None
-                }
-            }
-            Direction::East => Some(Coordinates::new(self.row, self.column + 1)),
-            Direction::SouthEast => Some(Coordinates::new(self.row + 1, self.column + 1)),
-            Direction::South => Some(Coordinates::new(self.row + 1, self.column)),
-            Direction::SouthWest => {
+            Direction::West | Direction::East => Some(self.row),
+            Direction::SouthWest | Direction::South | Direction::SouthEast => Some(self.row + 1),
+        }) else {
+            return None;
+        };
+
+        let Some(column) = (match direction {
+            Direction::NorthWest | Direction::West | Direction::SouthWest => {
                 if self.column > 0 {
-                    Some(Coordinates::new(self.row + 1, self.column - 1))
+                    Some(self.column - 1)
                 } else {
                     None
                 }
             }
-            Direction::West => {
-                if self.column > 0 {
-                    Some(Coordinates::new(self.row, self.column - 1))
-                } else {
-                    None
-                }
-            }
-            Direction::NorthWest => {
-                if self.row > 0 && self.column > 0 {
-                    Some(Coordinates::new(self.row - 1, self.column - 1))
-                } else {
-                    None
-                }
-            }
-        }
+            Direction::North | Direction::South => Some(self.column),
+            Direction::NorthEast | Direction::East | Direction::SouthEast => Some(self.column + 1),
+        }) else {
+            return None;
+        };
+
+        Some(Coordinates::new(row, column))
     }
 }
 
@@ -176,16 +165,17 @@ fn find_eligible_neighbors(grid: &[Vec<u8>], start: Coordinates) -> Vec<Directio
     Direction::cardinal()
         .iter()
         .filter_map(|direction| {
-            if let Some((value, from)) = start
+            start
                 .step(*direction)
                 .and_then(|coordinates| grid.at(coordinates))
-                .map(|value| (value, direction.opposite()))
-            {
-                if can_enter(value, from) {
-                    return Some(*direction);
-                }
-            }
-            None
+                .and_then(|value| {
+                    let from = direction.opposite();
+                    if can_enter(value, from) {
+                        Some(*direction)
+                    } else {
+                        None
+                    }
+                })
         })
         .collect()
 }
