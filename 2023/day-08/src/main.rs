@@ -65,24 +65,27 @@ fn main() {
         })
         .collect::<HashMap<_, _>>();
 
-    let mut steps = 0;
-    let mut direction = directions.iter().cycle();
-    let mut current = String::from("AAA");
-    while current != "ZZZ" {
-        steps += 1;
-        match direction.next().unwrap() {
-            Direction::Left => {
-                current = map[&current].left.clone();
-            }
-            Direction::Right => {
-                current = map[&current].right.clone();
+    if map.contains_key("ZZZ") {
+        let mut steps = 0;
+        let mut direction = directions.iter().cycle();
+        let mut current = String::from("AAA");
+        while current != "ZZZ" {
+            steps += 1;
+            match direction.next().unwrap() {
+                Direction::Left => {
+                    current = map[&current].left.clone();
+                }
+                Direction::Right => {
+                    current = map[&current].right.clone();
+                }
             }
         }
+
+        println!("{steps}");
     }
 
-    println!("{steps}");
-
-    let ghost_steps = map
+    let mut keys_with_factored_length = 0;
+    let mut ghost_steps = map
         .keys()
         .filter_map(|key| {
             if key.as_bytes()[2] != b'A' {
@@ -104,11 +107,19 @@ fn main() {
                 }
             }
 
-            assert!(steps % directions.len() == 0);
-            Some(steps / directions.len())
+            if steps % directions.len() == 0 {
+                keys_with_factored_length += 1;
+                steps /= directions.len();
+            }
+
+            Some(steps)
         })
-        .product::<usize>()
-        * directions.len();
+        .product::<usize>();
+
+    if keys_with_factored_length > 0 {
+        assert!(keys_with_factored_length == map.keys().filter(|key| key.ends_with('A')).count());
+        ghost_steps *= directions.len();
+    }
 
     println!("{ghost_steps}");
 }
