@@ -253,12 +253,7 @@ fn fill_tracker(mut grid: &mut [Vec<u8>], coordinates: Coordinates, value: u8, f
 
 fn flood_fill(tracker: &mut [Vec<u8>], start: Coordinates) {
     let value = tracker.at(start).unwrap();
-    for direction in [
-        Direction::North,
-        Direction::East,
-        Direction::South,
-        Direction::West,
-    ] {
+    for direction in Direction::cardinal() {
         let neighbor = start.step(direction);
         if maybe_set(tracker, neighbor, value) {
             flood_fill(tracker, neighbor.unwrap());
