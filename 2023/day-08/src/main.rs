@@ -43,6 +43,19 @@ impl Pair {
     }
 }
 
+fn greatest_common_denominator(mut a: usize, mut b: usize) -> usize {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a
+}
+
+fn least_common_multiple(a: usize, b: usize) -> usize {
+    a * b / greatest_common_denominator(a, b)
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -84,8 +97,7 @@ fn main() {
         println!("{steps}");
     }
 
-    let mut keys_with_factored_length = 0;
-    let mut ghost_steps = map
+    let ghost_steps = map
         .keys()
         .filter_map(|key| {
             if key.as_bytes()[2] != b'A' {
@@ -106,20 +118,25 @@ fn main() {
                     }
                 }
             }
+            let first_z = current.clone();
 
-            if steps % directions.len() == 0 {
-                keys_with_factored_length += 1;
-                steps /= directions.len();
+            // Verify that the cycle repeats to the same **Z with the same period
+            for _ in 0..steps {
+                match direction.next().unwrap() {
+                    Direction::Left => {
+                        current = map[&current].left.clone();
+                    }
+                    Direction::Right => {
+                        current = map[&current].right.clone();
+                    }
+                }
             }
+            assert!(current == first_z);
 
             Some(steps)
         })
-        .product::<usize>();
-
-    if keys_with_factored_length > 0 {
-        assert!(keys_with_factored_length == map.keys().filter(|key| key.ends_with('A')).count());
-        ghost_steps *= directions.len();
-    }
+        .reduce(least_common_multiple)
+        .unwrap();
 
     println!("{ghost_steps}");
 }
