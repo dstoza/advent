@@ -67,13 +67,12 @@ fn count_segment_arrangements(segment: &[u8], lengths: &[u8], cache: &mut Cache)
                 return None;
             }
 
-            let remainder = if start + first_length + 1 < segment.len() {
-                &segment[start + first_length + 1..]
+            if start + first_length + 1 < segment.len() {
+                let remainder = &segment[start + first_length + 1..];
+                Some(count_segment_arrangements(remainder, &lengths[1..], cache))
             } else {
-                &[]
-            };
-
-            Some(count_segment_arrangements(remainder, &lengths[1..], cache))
+                Some(usize::from(lengths.len() == 1))
+            }
         })
         .collect::<Vec<_>>();
 
