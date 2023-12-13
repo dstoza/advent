@@ -14,27 +14,49 @@ fn transpose(rows: &[Vec<u8>]) -> Vec<Vec<u8>> {
     columns
 }
 
-fn find_reflection(line: &[Vec<u8>]) -> Option<usize> {
+enum Reflection {
+    Row(usize),
+    Column(usize),
+}
+
+fn find_line_reflections(line: &[Vec<u8>]) -> Vec<usize> {
+    let mut reflections = Vec::new();
     for split in 1..line.len() {
         let mut zipped = line[0..split].iter().rev().zip(line[split..].iter());
         if zipped.all(|(l, r)| l == r) {
-            return Some(split);
+            reflections.push(split);
         }
     }
-    None
+    reflections
 }
 
-fn reflection_score(rows: &[Vec<u8>]) -> usize {
-    if let Some(reflection) = find_reflection(rows) {
-        return reflection * 100;
-    }
+fn find_all_reflections(rows: &[Vec<u8>]) -> Vec<Reflection> {
+    let mut reflections = Vec::new();
+
+    reflections.extend(
+        find_line_reflections(rows)
+            .iter()
+            .map(|index| Reflection::Row(*index)),
+    );
 
     let columns = transpose(rows);
-    if let Some(reflection) = find_reflection(&columns) {
-        return reflection;
-    }
+    reflections.extend(
+        find_line_reflections(&columns)
+            .iter()
+            .map(|index| Reflection::Column(*index)),
+    );
 
-    unreachable!()
+    reflections
+}
+
+fn reflection_score(reflections: &[Reflection]) -> usize {
+    reflections
+        .iter()
+        .map(|reflection| match reflection {
+            Reflection::Row(value) => *value * 100,
+            Reflection::Column(value) => *value,
+        })
+        .sum()
 }
 
 fn main() {
@@ -45,14 +67,14 @@ fn main() {
     let mut total = 0;
     for line in reader.lines().map(std::result::Result::unwrap) {
         if line.is_empty() {
-            total += reflection_score(&rows);
+            total += reflection_score(&find_all_reflections(&rows));
             rows.clear();
             continue;
         }
 
         rows.push(Vec::from(line.as_bytes()));
     }
-    total += reflection_score(&rows);
+    total += reflection_score(&find_all_reflections(&rows));
 
     println!("{total}");
 }
