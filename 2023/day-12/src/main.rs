@@ -82,17 +82,17 @@ fn count_segment_arrangements(segment: &[u8], lengths: &[u8], cache: &mut Cache)
 }
 
 fn count_arrangements(segments: &[Vec<u8>], lengths: &[u8], cache: &mut Cache) -> usize {
-    let key = segments
-        .iter()
-        .map(std::vec::Vec::as_slice)
-        .collect::<Vec<_>>();
-    let key = key.as_slice().join(&b'.');
-
     let known: u8 = lengths.iter().sum();
     let spaces: usize = segments.iter().map(std::vec::Vec::len).sum();
     if usize::from(known) > spaces {
         return 0;
     }
+
+    let key = segments
+        .iter()
+        .map(std::vec::Vec::as_slice)
+        .collect::<Vec<_>>();
+    let key = key.as_slice().join(&b'.');
 
     let seen = bytecount::count(&key, b'#');
     if seen > usize::from(known) {
