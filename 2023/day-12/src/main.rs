@@ -13,19 +13,11 @@ type Key = SmallVec<[u8; 64]>;
 #[derive(Default)]
 struct Cache {
     data: HashMap<Key, usize>,
-    hits: usize,
-    misses: usize,
 }
 
 impl Cache {
     fn get(&mut self, key: &Key) -> Option<usize> {
-        if let Some(value) = self.data.get(key) {
-            self.hits += 1;
-            Some(*value)
-        } else {
-            self.misses += 1;
-            None
-        }
+        self.data.get(key).copied()
     }
 
     fn insert(&mut self, key: Key, value: usize) {
@@ -142,8 +134,12 @@ fn main() {
             let mut split = line.split_whitespace();
 
             let segments = split.next().unwrap();
+
+            #[cfg(feature = "expand")]
             let segments = (0..5).map(|_| segments).collect::<Vec<_>>();
+            #[cfg(feature = "expand")]
             let segments = segments.join("?");
+
             let segments = segments
                 .split('.')
                 .filter_map(|segment| {
@@ -161,6 +157,8 @@ fn main() {
                 .split(',')
                 .map(|length| length.parse::<u8>().unwrap())
                 .collect::<Vec<_>>();
+
+            #[cfg(feature = "expand")]
             let lengths = lengths
                 .iter()
                 .copied()
@@ -173,5 +171,4 @@ fn main() {
         .sum();
 
     println!("{sum}");
-    println!("hits {} misses {}", cache.hits, cache.misses);
 }
