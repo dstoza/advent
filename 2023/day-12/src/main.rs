@@ -34,17 +34,14 @@ fn count_segment_arrangements(segment: &[u8], lengths: &[u8], cache: &mut Cache)
     }
 
     if segment.iter().any(|b| *b == b'#') && lengths.is_empty() {
-        cache.insert(key, 0);
         return 0;
     }
 
     if lengths.is_empty() {
-        cache.insert(key, 1);
         return 1;
     }
 
     if usize::from(lengths.iter().copied().sum::<u8>()) + lengths.len() - 1 > segment.len() {
-        cache.insert(key, 0);
         return 0;
     }
 
