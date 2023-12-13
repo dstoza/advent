@@ -87,6 +87,18 @@ fn count_arrangements(segments: &[Vec<u8>], lengths: &[u8], cache: &mut Cache) -
         .map(std::vec::Vec::as_slice)
         .collect::<Vec<_>>();
     let key = key.as_slice().join(&b'.');
+
+    let known: u8 = lengths.iter().sum();
+    let spaces: usize = segments.iter().map(std::vec::Vec::len).sum();
+    if usize::from(known) > spaces {
+        return 0;
+    }
+
+    let seen = bytecount::count(&key, b'#');
+    if seen > usize::from(known) {
+        return 0;
+    }
+
     let mut key = SmallVec::from(key);
     key.push(b' ');
     key.extend_from_slice(lengths);
