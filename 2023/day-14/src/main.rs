@@ -1,4 +1,8 @@
+#![feature(test)]
 #![warn(clippy::pedantic)]
+
+extern crate test;
+
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     fs::File,
@@ -6,7 +10,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 struct Grid {
     rows: Vec<u8>,
     columns: Vec<u8>,
@@ -14,15 +18,51 @@ struct Grid {
     height: usize,
 }
 
+impl Hash for Grid {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.rows.hash(state);
+    }
+}
+
 fn compress_left(line: &mut [u8]) {
     for segment in line.split_mut(|b| *b == b'#') {
-        segment.sort_unstable_by(|l, r| r.cmp(l));
+        if segment.len() < 2 {
+            continue;
+        }
+
+        let mut left = 0;
+        let mut right = segment.len() - 1;
+        while left != right {
+            match (segment[left], segment[right]) {
+                (b'O', _) => left += 1,
+                (_, b'O') => {
+                    segment.swap(left, right);
+                    right -= 1;
+                }
+                _ => right -= 1,
+            }
+        }
     }
 }
 
 fn compress_right(line: &mut [u8]) {
     for segment in line.split_mut(|b| *b == b'#') {
-        segment.sort_unstable();
+        if segment.len() < 2 {
+            continue;
+        }
+
+        let mut left = 0;
+        let mut right = segment.len() - 1;
+        while left != right {
+            match (segment[left], segment[right]) {
+                (_, b'O') => right -= 1,
+                (b'O', _) => {
+                    segment.swap(left, right);
+                    left += 1;
+                }
+                _ => left += 1,
+            }
+        }
     }
 }
 
@@ -103,10 +143,9 @@ impl Grid {
     }
 }
 
-fn main() {
+fn load_grid() -> Grid {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-
     let mut rows = Vec::new();
     let mut width = None;
     for line in reader.lines().map(std::result::Result::unwrap) {
@@ -114,26 +153,49 @@ fn main() {
         width = width.or(Some(line.len()));
         rows.extend_from_slice(line);
     }
-    let mut just_north = Grid::new(rows, width.unwrap());
-    let mut cycled = just_north.clone();
-    just_north.slide_north();
-    println!("{}", just_north.load());
+    Grid::new(rows, width.unwrap())
+}
 
+fn get_billion_load(mut grid: Grid) -> usize {
     let mut last_seen = HashMap::new();
     for cycle in 1..1_000_000_000 {
-        cycled.run_cycle();
-        let mut hasher = DefaultHasher::new();
-        cycled.hash(&mut hasher);
-        let hash = hasher.finish();
+        grid.run_cycle();
+
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            grid.hash(&mut hasher);
+            hasher.finish()
+        };
 
         if let Some(last) = last_seen.get(&hash) {
             let cycle_length = cycle - last;
             if (1_000_000_000 - cycle) % cycle_length == 0 {
-                println!("{}", cycled.load());
-                break;
+                return grid.load();
             }
         }
 
         last_seen.insert(hash, cycle);
+    }
+
+    unreachable!()
+}
+
+fn main() {
+    let mut just_north = load_grid();
+    let cycled = just_north.clone();
+    just_north.slide_north();
+    println!("{}", just_north.load());
+
+    println!("{}", get_billion_load(cycled));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[bench]
+    fn billion_bench(bencher: &mut test::Bencher) {
+        let grid = load_grid();
+        bencher.iter(|| assert!(get_billion_load(grid.clone()) == 96105));
     }
 }
