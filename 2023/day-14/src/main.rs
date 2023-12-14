@@ -32,11 +32,12 @@ fn compress_left(line: &mut [u8]) {
 
         let mut left = 0;
         let mut right = segment.len() - 1;
-        while left != right {
+        while left < right {
             match (segment[left], segment[right]) {
                 (b'O', _) => left += 1,
                 (_, b'O') => {
                     segment.swap(left, right);
+                    left += 1;
                     right -= 1;
                 }
                 _ => right -= 1,
@@ -53,11 +54,12 @@ fn compress_right(line: &mut [u8]) {
 
         let mut left = 0;
         let mut right = segment.len() - 1;
-        while left != right {
+        while left < right {
             match (segment[left], segment[right]) {
                 (_, b'O') => right -= 1,
                 (b'O', _) => {
                     segment.swap(left, right);
+                    right -= 1;
                     left += 1;
                 }
                 _ => left += 1,
