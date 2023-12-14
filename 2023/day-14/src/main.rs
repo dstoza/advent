@@ -1,4 +1,3 @@
-#![feature(iter_intersperse)]
 #![warn(clippy::pedantic)]
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
