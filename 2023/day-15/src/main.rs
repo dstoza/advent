@@ -9,8 +9,8 @@ fn hash(data: &[u8]) -> usize {
     let mut hash = 0;
     for b in data {
         hash += usize::from(*b);
-        hash += hash << 4;
-        hash &= 0xFF;
+        hash *= 17;
+        hash %= 256;
     }
 
     hash
