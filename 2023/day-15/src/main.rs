@@ -10,7 +10,7 @@ fn hash(data: &[u8]) -> usize {
     for b in data {
         hash += usize::from(*b);
         hash += hash << 4;
-        hash %= 256;
+        hash &= 0xFF;
     }
 
     hash
