@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::VecDeque,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -10,10 +10,10 @@ const BLANK: u8 = b'X';
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
+    Up = 1,
+    Down = 2,
+    Left = 4,
+    Right = 8,
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -48,12 +48,12 @@ impl Beam {
         }
     }
 
-    fn advance(&mut self, grid: &[Vec<u8>], visited: &mut HashSet<Beam>) -> [Option<Self>; 2] {
-        if visited.contains(self) {
+    fn advance(&mut self, grid: &[Vec<u8>], visited: &mut [Vec<u8>]) -> [Option<Self>; 2] {
+        if visited[self.row][self.column] & self.direction as u8 != 0 {
             return [None; 2];
         }
 
-        visited.insert(*self);
+        visited[self.row][self.column] |= self.direction as u8;
 
         match grid[self.row].get(self.column).unwrap() {
             b'.' => {
@@ -109,22 +109,19 @@ impl Beam {
 fn count_energized(from: Beam, grid: &[Vec<u8>]) -> usize {
     let mut beams = VecDeque::new();
     beams.push_back(from);
-    let mut visited = HashSet::new();
+    let mut visited = vec![vec![0; grid[0].len()]; grid.len()];
     while let Some(mut beam) = beams.pop_front() {
         for continuation in beam.advance(grid, &mut visited).into_iter().flatten() {
             beams.push_back(continuation);
         }
     }
 
-    let visited = visited
-        .iter()
-        .map(|beam| (beam.row, beam.column))
-        .collect::<HashSet<_>>();
     visited
         .iter()
-        .filter(|(row, column)| {
-            *row != 0 && *row != grid.len() - 1 && *column != 0 && *column != grid[0].len() - 1
-        })
+        .skip(1)
+        .take(visited.len() - 2)
+        .flat_map(|row| row.iter().skip(1).take(row.len() - 2))
+        .filter(|b| **b != 0)
         .count()
 }
 
