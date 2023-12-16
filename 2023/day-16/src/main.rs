@@ -1,7 +1,6 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::VecDeque,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -48,9 +47,9 @@ impl Beam {
         }
     }
 
-    fn advance(&mut self, grid: &[Vec<u8>], visited: &mut [Vec<u8>]) -> [Option<Self>; 2] {
+    fn energize(&mut self, grid: &[Vec<u8>], visited: &mut [Vec<u8>]) {
         if visited[self.row][self.column] & self.direction as u8 != 0 {
-            return [None; 2];
+            return;
         }
 
         visited[self.row][self.column] |= self.direction as u8;
@@ -58,7 +57,7 @@ impl Beam {
         match grid[self.row].get(self.column).unwrap() {
             b'.' => {
                 self.step(self.direction);
-                [Some(*self), None]
+                self.energize(grid, visited);
             }
             b'/' => {
                 self.direction = match self.direction {
@@ -68,7 +67,7 @@ impl Beam {
                     Direction::Right => Direction::Up,
                 };
                 self.step(self.direction);
-                [Some(*self), None]
+                self.energize(grid, visited);
             }
             b'\\' => {
                 self.direction = match self.direction {
@@ -78,43 +77,37 @@ impl Beam {
                     Direction::Right => Direction::Down,
                 };
                 self.step(self.direction);
-                [Some(*self), None]
+                self.energize(grid, visited);
             }
             b'|' => match self.direction {
                 Direction::Up | Direction::Down => {
                     self.step(self.direction);
-                    [Some(*self), None]
+                    self.energize(grid, visited);
                 }
-                Direction::Left | Direction::Right => [
-                    Some(self.split(Direction::Up)),
-                    Some(self.split(Direction::Down)),
-                ],
+                Direction::Left | Direction::Right => {
+                    self.split(Direction::Up).energize(grid, visited);
+                    self.split(Direction::Down).energize(grid, visited);
+                }
             },
             b'-' => match self.direction {
                 Direction::Left | Direction::Right => {
                     self.step(self.direction);
-                    [Some(*self), None]
+                    self.energize(grid, visited);
                 }
-                Direction::Up | Direction::Down => [
-                    Some(self.split(Direction::Left)),
-                    Some(self.split(Direction::Right)),
-                ],
+                Direction::Up | Direction::Down => {
+                    self.split(Direction::Left).energize(grid, visited);
+                    self.split(Direction::Right).energize(grid, visited);
+                }
             },
-            &BLANK => [None; 2],
+            &BLANK => (),
             _ => unimplemented!(),
         }
     }
 }
 
-fn count_energized(from: Beam, grid: &[Vec<u8>]) -> usize {
-    let mut beams = VecDeque::new();
-    beams.push_back(from);
+fn count_energized(mut from: Beam, grid: &[Vec<u8>]) -> usize {
     let mut visited = vec![vec![0; grid[0].len()]; grid.len()];
-    while let Some(mut beam) = beams.pop_front() {
-        for continuation in beam.advance(grid, &mut visited).into_iter().flatten() {
-            beams.push_back(continuation);
-        }
-    }
+    from.energize(grid, &mut visited);
 
     visited
         .iter()
