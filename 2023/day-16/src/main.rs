@@ -54,7 +54,8 @@ impl Beam {
 
         visited[self.row][self.column] |= self.direction as u8;
 
-        match grid[self.row].get(self.column).unwrap() {
+        #[allow(clippy::match_on_vec_items)]
+        match grid[self.row][self.column] {
             b'.' => {
                 self.step(self.direction);
                 self.energize(grid, visited);
@@ -99,8 +100,7 @@ impl Beam {
                     self.split(Direction::Right).energize(grid, visited);
                 }
             },
-            &BLANK => (),
-            _ => unimplemented!(),
+            _ => (),
         }
     }
 }
@@ -109,13 +109,11 @@ fn count_energized(mut from: Beam, grid: &[Vec<u8>]) -> usize {
     let mut visited = vec![vec![0; grid[0].len()]; grid.len()];
     from.energize(grid, &mut visited);
 
-    visited
-        .iter()
-        .skip(1)
-        .take(visited.len() - 2)
-        .flat_map(|row| row.iter().skip(1).take(row.len() - 2))
-        .filter(|b| **b != 0)
-        .count()
+    let mut count = 0;
+    for row in &visited[1..visited.len() - 1] {
+        count += bytecount::count(&row[1..row.len() - 1], 0);
+    }
+    (visited.len() - 2) * (visited[0].len() - 2) - count
 }
 
 fn main() {
