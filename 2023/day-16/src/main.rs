@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -48,9 +48,9 @@ impl Beam {
         }
     }
 
-    fn advance(&mut self, grid: &[Vec<u8>], visited: &mut HashSet<Beam>) -> Vec<Self> {
+    fn advance(&mut self, grid: &[Vec<u8>], visited: &mut HashSet<Beam>) -> [Option<Self>; 2] {
         if visited.contains(self) {
-            return Vec::new();
+            return [None; 2];
         }
 
         visited.insert(*self);
@@ -58,7 +58,7 @@ impl Beam {
         match grid[self.row].get(self.column).unwrap() {
             b'.' => {
                 self.step(self.direction);
-                vec![*self]
+                [Some(*self), None]
             }
             b'/' => {
                 self.direction = match self.direction {
@@ -68,7 +68,7 @@ impl Beam {
                     Direction::Right => Direction::Up,
                 };
                 self.step(self.direction);
-                vec![*self]
+                [Some(*self), None]
             }
             b'\\' => {
                 self.direction = match self.direction {
@@ -78,40 +78,42 @@ impl Beam {
                     Direction::Right => Direction::Down,
                 };
                 self.step(self.direction);
-                vec![*self]
+                [Some(*self), None]
             }
             b'|' => match self.direction {
                 Direction::Up | Direction::Down => {
                     self.step(self.direction);
-                    vec![*self]
+                    [Some(*self), None]
                 }
-                Direction::Left | Direction::Right => {
-                    vec![self.split(Direction::Up), self.split(Direction::Down)]
-                }
+                Direction::Left | Direction::Right => [
+                    Some(self.split(Direction::Up)),
+                    Some(self.split(Direction::Down)),
+                ],
             },
             b'-' => match self.direction {
                 Direction::Left | Direction::Right => {
                     self.step(self.direction);
-                    vec![*self]
+                    [Some(*self), None]
                 }
-                Direction::Up | Direction::Down => {
-                    vec![self.split(Direction::Left), self.split(Direction::Right)]
-                }
+                Direction::Up | Direction::Down => [
+                    Some(self.split(Direction::Left)),
+                    Some(self.split(Direction::Right)),
+                ],
             },
-            &BLANK => Vec::new(),
+            &BLANK => [None; 2],
             _ => unimplemented!(),
         }
     }
 }
 
 fn count_energized(from: Beam, grid: &[Vec<u8>]) -> usize {
-    let mut beams = vec![from];
+    let mut beams = VecDeque::new();
+    beams.push_back(from);
     let mut visited = HashSet::new();
-    while !beams.is_empty() {
-        beams = beams
-            .into_iter()
-            .flat_map(|mut beam| beam.advance(grid, &mut visited))
-            .collect::<Vec<_>>();
+    while let Some(mut beam) = beams.pop_front() {
+        for continuation in beam.advance(grid, &mut visited).into_iter().flatten() {
+            beams.push_back(continuation);
+        }
     }
 
     let visited = visited
