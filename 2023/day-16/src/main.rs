@@ -150,4 +150,33 @@ fn main() {
         "{}",
         count_energized(Beam::new(1, 1, Direction::Right), &grid)
     );
+
+    let first_row = 1;
+    let last_row = grid.len() - 2;
+    let first_column = 1;
+    let last_column = grid[0].len() - 2;
+
+    let mut max = 0;
+    for row in first_row..=last_row {
+        max = max.max(count_energized(
+            Beam::new(row, first_column, Direction::Right),
+            &grid,
+        ));
+        max = max.max(count_energized(
+            Beam::new(row, last_column, Direction::Left),
+            &grid,
+        ));
+    }
+    for column in first_column..=last_column {
+        max = max.max(count_energized(
+            Beam::new(first_row, column, Direction::Down),
+            &grid,
+        ));
+        max = max.max(count_energized(
+            Beam::new(last_row, column, Direction::Up),
+            &grid,
+        ));
+    }
+
+    println!("{max}");
 }
