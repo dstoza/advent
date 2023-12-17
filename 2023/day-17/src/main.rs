@@ -67,20 +67,50 @@ impl Location {
         }
     }
 
-    fn turn_left(self) -> Self {
+    #[cfg(not(feature = "ultra"))]
+    #[allow(clippy::unnecessary_wraps)]
+    fn turn_left(self) -> Option<Self> {
         let mut left = self;
         left.direction = left.direction.left();
         left.step();
         left.straight_remaining = 2;
-        left
+        Some(left)
     }
 
-    fn turn_right(self) -> Self {
+    #[cfg(feature = "ultra")]
+    fn turn_left(self) -> Option<Self> {
+        if self.straight_remaining > 6 {
+            return None;
+        }
+
+        let mut left = self;
+        left.direction = left.direction.left();
+        left.step();
+        left.straight_remaining = 9;
+        Some(left)
+    }
+
+    #[cfg(not(feature = "ultra"))]
+    #[allow(clippy::unnecessary_wraps)]
+    fn turn_right(self) -> Option<Self> {
         let mut right = self;
         right.direction = right.direction.right();
         right.step();
         right.straight_remaining = 2;
-        right
+        Some(right)
+    }
+
+    #[cfg(feature = "ultra")]
+    fn turn_right(self) -> Option<Self> {
+        if self.straight_remaining > 6 {
+            return None;
+        }
+
+        let mut right = self;
+        right.direction = right.direction.right();
+        right.step();
+        right.straight_remaining = 9;
+        Some(right)
     }
 
     fn go_straight(mut self) -> Option<Self> {
@@ -124,6 +154,11 @@ impl Ord for SearchNode {
 }
 
 fn find_least_loss(losses: &[Vec<u16>]) -> usize {
+    #[cfg(not(feature = "ultra"))]
+    const INITIAL_STRAIGHT: usize = 2;
+    #[cfg(feature = "ultra")]
+    const INITIAL_STRAIGHT: usize = 9;
+
     let mut heuristic = losses.to_vec();
     // for row in (1..heuristic.len() - 1).rev() {
     //     for column in (1..heuristic[0].len() - 1).rev() {
@@ -146,21 +181,14 @@ fn find_least_loss(losses: &[Vec<u16>]) -> usize {
         }
     }
 
-    // for row in &heuristic {
-    //     for value in row {
-    //         print!("{value:3} ");
-    //     }
-    //     println!();
-    // }
-
     let mut queue = BinaryHeap::from([
         SearchNode::new(
-            Location::new(1, 2, Direction::East, 2),
+            Location::new(1, 2, Direction::East, INITIAL_STRAIGHT),
             usize::from(losses[1][2]),
             usize::from(losses[1][2] + heuristic[1][2]),
         ),
         SearchNode::new(
-            Location::new(2, 1, Direction::South, 2),
+            Location::new(2, 1, Direction::South, INITIAL_STRAIGHT),
             usize::from(losses[2][1]),
             usize::from(losses[2][1] + heuristic[2][1]),
         ),
@@ -170,7 +198,16 @@ fn find_least_loss(losses: &[Vec<u16>]) -> usize {
 
     while let Some(node) = queue.pop() {
         let location = node.location;
+        #[cfg(not(feature = "ultra"))]
         if location.row == losses.len() - 2 && location.column == losses[0].len() - 2 {
+            return node.current_loss;
+        }
+
+        #[cfg(feature = "ultra")]
+        if location.row == losses.len() - 2
+            && location.column == losses[0].len() - 2
+            && location.straight_remaining <= 6
+        {
             return node.current_loss;
         }
 
@@ -188,20 +225,22 @@ fn find_least_loss(losses: &[Vec<u16>]) -> usize {
             continue;
         }
 
-        let left = location.turn_left();
-        let left_loss = left.get_value(losses);
-        if left_loss != 0 {
-            let current_loss = node.current_loss + left_loss;
-            let estimated_loss = current_loss + left.get_value(&heuristic);
-            queue.push(SearchNode::new(left, current_loss, estimated_loss));
+        if let Some(left) = location.turn_left() {
+            let left_loss = left.get_value(losses);
+            if left_loss != 0 {
+                let current_loss = node.current_loss + left_loss;
+                let estimated_loss = current_loss + left.get_value(&heuristic);
+                queue.push(SearchNode::new(left, current_loss, estimated_loss));
+            }
         }
 
-        let right = location.turn_right();
-        let right_loss = right.get_value(losses);
-        if right_loss != 0 {
-            let current_loss = node.current_loss + right_loss;
-            let estimated_loss = current_loss + right.get_value(&heuristic);
-            queue.push(SearchNode::new(right, current_loss, estimated_loss));
+        if let Some(right) = location.turn_right() {
+            let right_loss = right.get_value(losses);
+            if right_loss != 0 {
+                let current_loss = node.current_loss + right_loss;
+                let estimated_loss = current_loss + right.get_value(&heuristic);
+                queue.push(SearchNode::new(right, current_loss, estimated_loss));
+            }
         }
 
         let Some(straight) = location.go_straight() else {
