@@ -94,7 +94,7 @@ impl Location {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 struct SearchNode {
     location: Location,
     current_loss: usize,
@@ -124,19 +124,34 @@ impl Ord for SearchNode {
 }
 
 fn find_least_loss(losses: &[Vec<u16>]) -> usize {
-    let mut heuristic = vec![vec![0u16; losses[0].len()]; losses.len()];
-    for row in (1..heuristic.len() - 1).rev() {
-        for column in (1..heuristic[0].len() - 1).rev() {
-            if heuristic[row + 1][column] == 0 {
-                heuristic[row][column] += heuristic[row][column + 1];
-            } else if heuristic[row][column + 1] == 0 {
-                heuristic[row][column] += heuristic[row + 1][column];
-            } else {
-                heuristic[row][column] +=
-                    heuristic[row][column + 1].min(heuristic[row + 1][column]);
-            }
+    let mut heuristic = losses.to_vec();
+    // for row in (1..heuristic.len() - 1).rev() {
+    //     for column in (1..heuristic[0].len() - 1).rev() {
+    //         if heuristic[row + 1][column] == 0 {
+    //             heuristic[row][column] += heuristic[row][column + 1];
+    //         } else if heuristic[row][column + 1] == 0 {
+    //             heuristic[row][column] += heuristic[row + 1][column];
+    //         } else {
+    //             heuristic[row][column] +=
+    //                 heuristic[row][column + 1].min(heuristic[row + 1][column]);
+    //         }
+    //     }
+    // }
+
+    #[allow(clippy::cast_possible_truncation)]
+    for row in 1..heuristic.len() - 1 {
+        for column in 1..heuristic[0].len() - 1 {
+            heuristic[row][column] =
+                (heuristic.len() - row + heuristic[0].len() - column - 4) as u16;
         }
     }
+
+    // for row in &heuristic {
+    //     for value in row {
+    //         print!("{value:3} ");
+    //     }
+    //     println!();
+    // }
 
     let mut queue = BinaryHeap::from([
         SearchNode::new(
