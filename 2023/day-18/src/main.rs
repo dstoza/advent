@@ -5,6 +5,44 @@ use std::{
     io::{BufRead, BufReader},
 };
 
+fn flood_fill(grid: &mut [Vec<u8>], row: usize, column: usize, value: u8) {
+    let mut stack = vec![(row, column)];
+    while let Some((row, column)) = stack.pop() {
+        #[allow(clippy::cast_sign_loss)]
+        for (row_offset, column_offset) in [(0, 1), (0, -1), (1, 0), (-1, 0)] {
+            let row = match row_offset {
+                0 | 1 => row + row_offset as usize,
+                -1 => {
+                    if row == 0 {
+                        continue;
+                    }
+                    row - 1
+                }
+                _ => unreachable!(),
+            };
+
+            let column = match column_offset {
+                0 | 1 => column + column_offset as usize,
+                -1 => {
+                    if column == 0 {
+                        continue;
+                    }
+                    column - 1
+                }
+                _ => unreachable!(),
+            };
+
+            if (0..grid.len()).contains(&row)
+                && (0..grid[0].len()).contains(&column)
+                && grid[row][column] == b'.'
+            {
+                grid[row][column] = value;
+                stack.push((row, column));
+            }
+        }
+    }
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -40,14 +78,29 @@ fn main() {
     let bottom = *path.iter().map(|(row, _)| row).max().unwrap();
     let right = *path.iter().map(|(_, column)| column).max().unwrap();
 
-    for row in 0..=bottom + 1 {
-        for column in 0..=right + 1 {
-            if path.iter().any(|(r, c)| *r == row && *c == column) {
-                print!("#");
-            } else {
-                print!(".");
-            }
-        }
-        println!();
+    let mut grid = vec![vec![b'.'; right + 2]; bottom + 2];
+    for (r, c) in &path {
+        grid[*r][*c] = b'#';
     }
+
+    flood_fill(&mut grid, 1, 1, b'o');
+
+    let (interior_row, interior_column, _) = grid
+        .iter()
+        .enumerate()
+        .flat_map(|(row, line)| {
+            line.iter()
+                .enumerate()
+                .map(move |(column, value)| (row, column, *value))
+        })
+        .find(|(_, _, value)| *value == b'.')
+        .unwrap();
+
+    flood_fill(&mut grid, interior_row, interior_column, b'#');
+
+    let empty_count: usize = grid.iter().map(|line| bytecount::count(line, b'.')).sum();
+    assert_eq!(empty_count, 0);
+
+    let capacity: usize = grid.iter().map(|line| bytecount::count(line, b'#')).sum();
+    println!("{capacity}");
 }
