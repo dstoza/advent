@@ -57,6 +57,20 @@ fn get_horizontal_segments(lines: impl Iterator<Item = String>) -> Vec<(i64, Ran
                 .and_then(|distance| distance.parse().ok())
                 .unwrap();
 
+            let hex = split
+                .next()
+                .unwrap()
+                .trim_start_matches("(#")
+                .trim_end_matches(')');
+            let distance = i64::from_str_radix(&hex[0..5], 16).unwrap();
+            let direction = match &hex[5..] {
+                "0" => "R",
+                "1" => "D",
+                "2" => "L",
+                "3" => "U",
+                _ => unreachable!(),
+            };
+
             match direction {
                 "R" => {
                     let segment = column..=column + distance;
@@ -105,18 +119,14 @@ fn get_contained_area(segments: &[(i64, RangeInclusive<i64>)]) -> i64 {
             None => true,
         };
 
-        println!("start {row} {segment:?} {last_segment_of_row}");
-
         if let Some(last_row) = last_row {
             if *row > last_row {
                 shrink = 0;
-                println!("{open_segments:?}");
                 area += open_segments
                     .iter()
                     .map(|segment| *segment.end() - *segment.start() + 1)
                     .sum::<i64>()
                     * (*row - last_row - 1);
-                println!("row {row} updated area to {area} a");
             }
         }
 
@@ -173,15 +183,12 @@ fn get_contained_area(segments: &[(i64, RangeInclusive<i64>)]) -> i64 {
             open_segments = merged;
         }
 
-        println!("open: {open_segments:?}");
-
         if last_segment_of_row {
             area += open_segments
                 .iter()
                 .map(|segment| *segment.end() - *segment.start() + 1)
                 .sum::<i64>()
                 + shrink;
-            println!("row {row} updated area to {area} b");
         }
 
         last_row = Some(*row);
@@ -195,10 +202,6 @@ fn main() {
     let reader = BufReader::new(file);
     let horizontal_segments =
         get_horizontal_segments(reader.lines().map(std::result::Result::unwrap));
-
-    for segment in &horizontal_segments {
-        println!("{segment:?}");
-    }
 
     let contained_area = get_contained_area(&horizontal_segments);
     println!("{contained_area}");
