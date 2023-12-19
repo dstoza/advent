@@ -1,8 +1,10 @@
 #![warn(clippy::pedantic)]
 
 use std::{
+    cmp::Ordering,
     fs::File,
     io::{BufRead, BufReader},
+    ops::RangeInclusive,
 };
 
 fn flood_fill(grid: &mut [Vec<u8>], row: usize, column: usize, value: u8) {
@@ -43,64 +45,161 @@ fn flood_fill(grid: &mut [Vec<u8>], row: usize, column: usize, value: u8) {
     }
 }
 
+fn get_horizontal_segments(lines: impl Iterator<Item = String>) -> Vec<(i64, RangeInclusive<i64>)> {
+    let mut row = 0;
+    let mut column = 0;
+    let mut segments: Vec<(i64, RangeInclusive<i64>)> = lines
+        .filter_map(|line| {
+            let mut split = line.split_whitespace();
+            let direction = split.next().unwrap();
+            let distance: i64 = split
+                .next()
+                .and_then(|distance| distance.parse().ok())
+                .unwrap();
+
+            match direction {
+                "R" => {
+                    let segment = column..=column + distance;
+                    column += distance;
+                    Some((row, segment))
+                }
+                "L" => {
+                    let segment = column - distance..=column;
+                    column -= distance;
+                    Some((row, segment))
+                }
+                "D" => {
+                    row += distance;
+                    None
+                }
+                "U" => {
+                    row -= distance;
+                    None
+                }
+                _ => None,
+            }
+        })
+        .collect();
+
+    segments.sort_unstable_by(|(left_row, left_range), (right_row, right_range)| {
+        match left_row.cmp(right_row) {
+            Ordering::Equal => left_range.start().cmp(right_range.start()),
+            _ => left_row.cmp(right_row),
+        }
+    });
+
+    segments
+}
+
+fn get_contained_area(segments: &[(i64, RangeInclusive<i64>)]) -> i64 {
+    let mut area = 0;
+
+    let mut last_row = None;
+    let mut open_segments: Vec<RangeInclusive<i64>> = Vec::new();
+    let mut shrink = 0;
+
+    let mut iterator = segments.iter().peekable();
+    while let Some((row, segment)) = iterator.next() {
+        let last_segment_of_row = match iterator.peek() {
+            Some((next_row, _)) => next_row != row,
+            None => true,
+        };
+
+        println!("start {row} {segment:?} {last_segment_of_row}");
+
+        if let Some(last_row) = last_row {
+            if *row > last_row {
+                shrink = 0;
+                println!("{open_segments:?}");
+                area += open_segments
+                    .iter()
+                    .map(|segment| *segment.end() - *segment.start() + 1)
+                    .sum::<i64>()
+                    * (*row - last_row - 1);
+                println!("row {row} updated area to {area} a");
+            }
+        }
+
+        if let Some(match_position) = open_segments.iter().position(|open| open == segment) {
+            let removed = open_segments.remove(match_position);
+            shrink += removed.end() - removed.start() + 1;
+        } else if let Some(extend_left) = open_segments
+            .iter_mut()
+            .find(|open| open.start() == segment.end())
+        {
+            *extend_left = *segment.start()..=*extend_left.end();
+        } else if let Some(shrink_left) = open_segments
+            .iter_mut()
+            .find(|open| open.start() == segment.start())
+        {
+            shrink += *segment.end() - *shrink_left.start();
+            *shrink_left = *segment.end()..=*shrink_left.end();
+        } else if let Some(extend_right) = open_segments
+            .iter_mut()
+            .find(|open| open.end() == segment.start())
+        {
+            *extend_right = *extend_right.start()..=*segment.end();
+        } else if let Some(shrink_right) = open_segments
+            .iter_mut()
+            .find(|open| open.end() == segment.end())
+        {
+            shrink += *shrink_right.end() - *segment.start();
+            *shrink_right = *shrink_right.start()..=*segment.start();
+        } else if let Some(split_position) = open_segments
+            .iter()
+            .position(|open| *open.start() < *segment.start() && *open.end() > *segment.end())
+        {
+            shrink += segment.end() - segment.start() - 1;
+            let split = open_segments.remove(split_position);
+            open_segments.push(*split.start()..=*segment.start());
+            open_segments.push(*segment.end()..=*split.end());
+        } else {
+            open_segments.push(segment.clone());
+        }
+
+        if !open_segments.is_empty() {
+            open_segments.sort_unstable_by_key(|segment| *segment.start());
+            let mut merged = Vec::new();
+            let mut previous = open_segments[0].clone();
+            for segment in &open_segments[1..] {
+                if segment.start() == previous.end() {
+                    previous = *previous.start()..=*segment.end();
+                } else {
+                    merged.push(previous);
+                    previous = segment.clone();
+                }
+            }
+            merged.push(previous);
+            open_segments = merged;
+        }
+
+        println!("open: {open_segments:?}");
+
+        if last_segment_of_row {
+            area += open_segments
+                .iter()
+                .map(|segment| *segment.end() - *segment.start() + 1)
+                .sum::<i64>()
+                + shrink;
+            println!("row {row} updated area to {area} b");
+        }
+
+        last_row = Some(*row);
+    }
+
+    area
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
-    let mut row = usize::MAX / 2;
-    let mut column = usize::MAX / 2;
-    let mut path = vec![(row, column)];
-    for line in reader.lines().map(std::result::Result::unwrap) {
-        let mut split = line.split_whitespace();
-        let direction = split.next().unwrap();
-        let distance: usize = split
-            .next()
-            .and_then(|distance| distance.parse().ok())
-            .unwrap();
-        for _ in 0..distance {
-            match direction {
-                "R" => column += 1,
-                "D" => row += 1,
-                "L" => column -= 1,
-                "U" => row -= 1,
-                _ => (),
-            }
-            path.push((row, column));
-        }
+    let horizontal_segments =
+        get_horizontal_segments(reader.lines().map(std::result::Result::unwrap));
+
+    for segment in &horizontal_segments {
+        println!("{segment:?}");
     }
 
-    let top = *path.iter().map(|(row, _)| row).min().unwrap();
-    let left = *path.iter().map(|(_, column)| column).min().unwrap();
-    let path = path
-        .into_iter()
-        .map(|(row, column)| (row - top + 1, column - left + 1))
-        .collect::<Vec<_>>();
-
-    let bottom = *path.iter().map(|(row, _)| row).max().unwrap();
-    let right = *path.iter().map(|(_, column)| column).max().unwrap();
-
-    let mut grid = vec![vec![b'.'; right + 2]; bottom + 2];
-    for (r, c) in &path {
-        grid[*r][*c] = b'#';
-    }
-
-    flood_fill(&mut grid, 1, 1, b'o');
-
-    let (interior_row, interior_column, _) = grid
-        .iter()
-        .enumerate()
-        .flat_map(|(row, line)| {
-            line.iter()
-                .enumerate()
-                .map(move |(column, value)| (row, column, *value))
-        })
-        .find(|(_, _, value)| *value == b'.')
-        .unwrap();
-
-    flood_fill(&mut grid, interior_row, interior_column, b'#');
-
-    let empty_count: usize = grid.iter().map(|line| bytecount::count(line, b'.')).sum();
-    assert_eq!(empty_count, 0);
-
-    let capacity: usize = grid.iter().map(|line| bytecount::count(line, b'#')).sum();
-    println!("{capacity}");
+    let contained_area = get_contained_area(&horizontal_segments);
+    println!("{contained_area}");
 }
