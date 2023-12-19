@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
+    ops::RangeInclusive,
 };
 
 #[derive(Debug)]
@@ -87,6 +88,93 @@ impl Condition {
     }
 }
 
+#[derive(Clone, Debug)]
+struct PartRange {
+    x: RangeInclusive<u64>,
+    m: RangeInclusive<u64>,
+    a: RangeInclusive<u64>,
+    s: RangeInclusive<u64>,
+}
+
+impl PartRange {
+    fn new() -> Self {
+        Self {
+            x: 1..=4000,
+            m: 1..=4000,
+            a: 1..=4000,
+            s: 1..=4000,
+        }
+    }
+
+    fn get_mut(&mut self, category: &str) -> &mut RangeInclusive<u64> {
+        match category {
+            "x" => &mut self.x,
+            "m" => &mut self.m,
+            "a" => &mut self.a,
+            "s" => &mut self.s,
+            _ => unreachable!(),
+        }
+    }
+
+    fn count(&self) -> u64 {
+        (self.x.end() - self.x.start() + 1)
+            * (self.m.end() - self.m.start() + 1)
+            * (self.a.end() - self.a.start() + 1)
+            * (self.s.end() - self.s.start() + 1)
+    }
+
+    fn filtered(&self, condition: &Condition) -> Option<Self> {
+        let mut filtered = self.clone();
+        match condition {
+            Condition::Greater(category, value) => {
+                let range = filtered.get_mut(category);
+                *range = (*range.start()).max(u64::from(*value) + 1)..=*range.end();
+                if range.is_empty() {
+                    None
+                } else {
+                    Some(filtered)
+                }
+            }
+            Condition::Less(category, value) => {
+                let range = filtered.get_mut(category);
+                *range = *range.start()..=(*range.end()).min(u64::from(*value) - 1);
+                if range.is_empty() {
+                    None
+                } else {
+                    Some(filtered)
+                }
+            }
+            Condition::Always => Some(filtered),
+        }
+    }
+
+    fn remainder(&self, condition: &Condition) -> Option<Self> {
+        match condition {
+            Condition::Greater(category, value) => {
+                let mut remainder = self.clone();
+                let range: &mut RangeInclusive<u64> = remainder.get_mut(category);
+                *range = *range.start()..=(*range.end()).min(u64::from(*value));
+                if range.is_empty() {
+                    None
+                } else {
+                    Some(remainder)
+                }
+            }
+            Condition::Less(category, value) => {
+                let mut remainder = self.clone();
+                let range = remainder.get_mut(category);
+                *range = (*range.start()).max(u64::from(*value))..=*range.end();
+                if range.is_empty() {
+                    None
+                } else {
+                    Some(remainder)
+                }
+            }
+            Condition::Always => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum Target {
     Accept,
@@ -145,6 +233,29 @@ fn is_accepted(part: &Part, workflow: &str, workflows: &HashMap<String, Vec<Rule
     false
 }
 
+fn count_rejected(
+    mut parts: PartRange,
+    workflow: &str,
+    workflows: &HashMap<String, Vec<Rule>>,
+) -> u64 {
+    let workflow = workflows.get(workflow).unwrap();
+    let mut rejected = 0;
+    for rule in workflow {
+        if let Some(filtered) = parts.filtered(&rule.condition) {
+            rejected += match &rule.target {
+                Target::Accept => 0,
+                Target::Reject => filtered.count(),
+                Target::Workflow(name) => count_rejected(filtered, name, workflows),
+            };
+        }
+        let Some(remainder) = parts.remainder(&rule.condition) else {
+            break;
+        };
+        parts = remainder;
+    }
+    rejected
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -181,4 +292,7 @@ fn main() {
         .sum();
 
     println!("{rating}");
+
+    let accepted = PartRange::new().count() - count_rejected(PartRange::new(), "in", &workflows);
+    println!("{accepted}");
 }
