@@ -7,6 +7,52 @@ use std::{
 };
 
 #[derive(Debug)]
+struct Part {
+    x: u16,
+    m: u16,
+    a: u16,
+    s: u16,
+}
+
+impl Part {
+    fn parse(string: &str) -> Self {
+        let mut split = string.split(',');
+        Self {
+            x: split
+                .next()
+                .and_then(|string| string.trim_start_matches("x=").parse().ok())
+                .unwrap(),
+            m: split
+                .next()
+                .and_then(|string| string.trim_start_matches("m=").parse().ok())
+                .unwrap(),
+            a: split
+                .next()
+                .and_then(|string| string.trim_start_matches("a=").parse().ok())
+                .unwrap(),
+            s: split
+                .next()
+                .and_then(|string| string.trim_start_matches("s=").parse().ok())
+                .unwrap(),
+        }
+    }
+
+    fn get(&self, category: &str) -> u16 {
+        match category {
+            "x" => self.x,
+            "m" => self.m,
+            "a" => self.a,
+            "s" => self.s,
+            _ => unreachable!(),
+        }
+    }
+
+    fn combined_rating(&self) -> u32 {
+        u32::from(self.x + self.m + self.a + self.s)
+    }
+}
+
+#[derive(Debug)]
 enum Condition {
     Greater(String, u16),
     Less(String, u16),
@@ -31,20 +77,28 @@ impl Condition {
             Self::Always
         }
     }
+
+    fn matches_part(&self, part: &Part) -> bool {
+        match self {
+            Self::Greater(category, value) => part.get(category) > *value,
+            Self::Less(category, value) => part.get(category) < *value,
+            Self::Always => true,
+        }
+    }
 }
 
 #[derive(Debug)]
 enum Target {
-    Workflow(String),
-    Reject,
     Accept,
+    Reject,
+    Workflow(String),
 }
 
 impl Target {
     fn parse(string: &str) -> Self {
         match string {
-            "R" => Self::Reject,
             "A" => Self::Accept,
+            "R" => Self::Reject,
             other => Self::Workflow(String::from(other)),
         }
     }
@@ -78,40 +132,17 @@ fn parse_workflow(string: &str) -> Vec<Rule> {
     split.map(Rule::parse).collect()
 }
 
-#[derive(Debug)]
-struct Part {
-    x: u16,
-    m: u16,
-    a: u16,
-    s: u16,
-}
-
-impl Part {
-    fn new(x: u16, m: u16, a: u16, s: u16) -> Self {
-        Self { x, m, a, s }
-    }
-
-    fn parse(string: &str) -> Self {
-        let mut split = string.split(',');
-        Self {
-            x: split
-                .next()
-                .and_then(|string| string.trim_start_matches("x=").parse().ok())
-                .unwrap(),
-            m: split
-                .next()
-                .and_then(|string| string.trim_start_matches("m=").parse().ok())
-                .unwrap(),
-            a: split
-                .next()
-                .and_then(|string| string.trim_start_matches("a=").parse().ok())
-                .unwrap(),
-            s: split
-                .next()
-                .and_then(|string| string.trim_start_matches("s=").parse().ok())
-                .unwrap(),
+fn is_accepted(part: &Part, workflow: &str, workflows: &HashMap<String, Vec<Rule>>) -> bool {
+    for step in workflows.get(workflow).unwrap() {
+        if step.condition.matches_part(part) {
+            match &step.target {
+                Target::Accept => return true,
+                Target::Reject => return false,
+                Target::Workflow(workflow) => return is_accepted(part, workflow, workflows),
+            }
         }
     }
+    false
 }
 
 fn main() {
@@ -138,11 +169,16 @@ fn main() {
         }
     }
 
-    for workflow in workflows {
-        println!("{workflow:?}");
-    }
+    let rating: u32 = parts
+        .iter()
+        .map(|part| {
+            if is_accepted(part, "in", &workflows) {
+                part.combined_rating()
+            } else {
+                0
+            }
+        })
+        .sum();
 
-    for part in parts {
-        println!("{part:?}");
-    }
+    println!("{rating}");
 }
