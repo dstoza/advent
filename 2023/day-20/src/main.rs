@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fmt::Debug,
     fs::File,
     io::{BufRead, BufReader},
@@ -9,6 +9,7 @@ use std::{
 
 trait Module: Debug {
     fn handle_inputs(&mut self, _inputs: Vec<String>) {}
+    fn send_pulse(&mut self, high: bool, from: &str) -> Vec<(String, bool)>;
 }
 
 #[derive(Debug)]
@@ -23,7 +24,19 @@ impl FlipFlop {
     }
 }
 
-impl Module for FlipFlop {}
+impl Module for FlipFlop {
+    fn send_pulse(&mut self, high: bool, _from: &str) -> Vec<(String, bool)> {
+        if high {
+            return Vec::new();
+        }
+
+        self.on = !self.on;
+        self.outputs
+            .iter()
+            .map(|output| (output.clone(), self.on))
+            .collect()
+    }
+}
 
 #[derive(Debug)]
 struct Conjunction {
@@ -42,10 +55,18 @@ impl Conjunction {
 
 impl Module for Conjunction {
     fn handle_inputs(&mut self, inputs: Vec<String>) {
-        println!("handle_inputs {self:?} {inputs:?}");
         for input in inputs {
             self.last_pulse.insert(input, false);
         }
+    }
+
+    fn send_pulse(&mut self, high: bool, from: &str) -> Vec<(String, bool)> {
+        *self.last_pulse.get_mut(from).unwrap() = high;
+        let all_high = self.last_pulse.values().all(|last| *last);
+        self.outputs
+            .iter()
+            .map(|output| (output.clone(), !all_high))
+            .collect()
     }
 }
 
@@ -60,7 +81,14 @@ impl Broadcaster {
     }
 }
 
-impl Module for Broadcaster {}
+impl Module for Broadcaster {
+    fn send_pulse(&mut self, high: bool, _from: &str) -> Vec<(String, bool)> {
+        self.outputs
+            .iter()
+            .map(|output| (output.clone(), high))
+            .collect()
+    }
+}
 
 fn collect_outputs(
     name: &str,
@@ -75,6 +103,72 @@ fn collect_outputs(
             .or_insert_with(|| vec![String::from(name)]);
     }
     outputs
+}
+
+fn count_pulses(
+    modules: &mut HashMap<String, Box<dyn Module>>,
+    iterations: usize,
+) -> (usize, usize) {
+    let mut high_pulses = 0;
+    let mut low_pulses = 0;
+
+    for _ in 0..iterations {
+        let mut queue =
+            VecDeque::from([(String::from("broadcaster"), false, String::from("button"))]);
+        while let Some((name, high, from)) = queue.pop_front() {
+            if high {
+                high_pulses += 1;
+            } else {
+                low_pulses += 1;
+            }
+
+            if let Some(module) = modules.get_mut(&name) {
+                let propagated = module.send_pulse(high, &from);
+                for (to, high) in propagated {
+                    queue.push_back((to, high, name.clone()));
+                }
+            }
+        }
+    }
+
+    (high_pulses, low_pulses)
+}
+
+fn presses_to_rx(modules: &mut HashMap<String, Box<dyn Module>>) -> usize {
+    let mut last_message = String::new();
+    let mut presses = 0;
+    loop {
+        presses += 1;
+        let mut queue =
+            VecDeque::from([(String::from("broadcaster"), false, String::from("button"))]);
+        while let Some((name, high, from)) = queue.pop_front() {
+            if let Some(module) = modules.get_mut(&name) {
+                if name == "zp" {
+                    let message = format!("{module:?}");
+                    if message != last_message {
+                        // println!("{presses} {message}");
+                        last_message = message;
+                    }
+                }
+                let propagated = module.send_pulse(high, &from);
+                for (to, high) in propagated {
+                    // if to == "ds" {
+                    //     println!("ds {high} {presses}");
+                    // }
+                    // if to == "nd" {
+                    //     println!("nd {high} {presses}");
+                    // }
+                    // if to == "sb" {
+                    //     println!("sb {high} {presses}");
+                    // }
+                    // if to == "hf" {
+                    //     println!("hf {high} {presses}");
+                    // }
+                    queue.push_back((to, high, name.clone()));
+                }
+            }
+        }
+    }
 }
 
 fn main() {
@@ -109,4 +203,13 @@ fn main() {
             module.handle_inputs(inputs);
         }
     }
+
+    for module in &modules {
+        println!("{module:?}");
+    }
+
+    // let (high_pulses, low_pulses) = count_pulses(&mut modules, 1000);
+    // println!("{high_pulses} {low_pulses} {}", high_pulses * low_pulses);
+
+    println!("{}", presses_to_rx(&mut modules));
 }
