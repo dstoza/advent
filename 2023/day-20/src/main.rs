@@ -146,24 +146,12 @@ fn presses_to_rx(modules: &mut HashMap<String, Box<dyn Module>>) -> usize {
                 if name == "zp" {
                     let message = format!("{module:?}");
                     if message != last_message {
-                        // println!("{presses} {message}");
+                        println!("{presses} {message}");
                         last_message = message;
                     }
                 }
                 let propagated = module.send_pulse(high, &from);
                 for (to, high) in propagated {
-                    // if to == "ds" {
-                    //     println!("ds {high} {presses}");
-                    // }
-                    // if to == "nd" {
-                    //     println!("nd {high} {presses}");
-                    // }
-                    // if to == "sb" {
-                    //     println!("sb {high} {presses}");
-                    // }
-                    // if to == "hf" {
-                    //     println!("hf {high} {presses}");
-                    // }
                     queue.push_back((to, high, name.clone()));
                 }
             }
