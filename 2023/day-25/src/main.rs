@@ -49,18 +49,32 @@ fn shortest_path(from: &str, to: &str, connections: &Connections) -> Vec<String>
     path
 }
 
-fn get_component_product(connections: &Connections) -> Option<usize> {
-    let mut nodes = connections.keys();
-    let from = nodes.next().unwrap();
-    let unreachable = nodes
-        .filter(|to| shortest_path(from, to, connections).len() == 1)
-        .count();
-    if unreachable == 0 {
-        None
-    } else {
-        Some(unreachable * (connections.len() - unreachable))
+fn count_reachable(connections: &Connections) -> usize {
+    let mut visited = HashSet::new();
+
+    let mut queue: VecDeque<String> =
+        VecDeque::from([String::from(connections.keys().next().unwrap())]);
+    while let Some(node) = queue.pop_front() {
+        if visited.contains(&node) {
+            continue;
+        }
+
+        visited.insert(node.clone());
+
+        if let Some(connections) = connections.get(&node) {
+            for connection in connections {
+                if visited.contains(connection) {
+                    continue;
+                }
+
+                queue.push_back(connection.clone());
+            }
+        }
     }
+
+    visited.len()
 }
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -89,8 +103,9 @@ fn main() {
     let mut rng = thread_rng();
 
     loop {
-        if let Some(component_product) = get_component_product(&connections) {
-            println!("component_product {component_product}");
+        let reachable = count_reachable(&connections);
+        if reachable < connections.len() {
+            println!("{}", reachable * (connections.len() - reachable));
             break;
         }
 
@@ -98,7 +113,7 @@ fn main() {
 
         let mut pairs: HashMap<String, usize> = HashMap::new();
 
-        for _ in 0..connections.len() / 100 {
+        for _ in 0..(connections.len() / 100).max(50) {
             let from = nodes.choose(&mut rng).unwrap();
             let to = nodes.choose(&mut rng).unwrap();
             if from == to {
@@ -122,8 +137,6 @@ fn main() {
         let (max_key, _) = pairs.last().unwrap();
         let max_a = &max_key[..3];
         let max_b = &max_key[3..];
-
-        println!("removing {max_a}-{max_b}");
 
         if let Some(connections) = connections.get_mut(max_a) {
             connections.remove(max_b);
