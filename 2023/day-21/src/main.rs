@@ -91,6 +91,20 @@ fn get_completed(counts: &[usize]) -> Option<Vec<usize>> {
     None
 }
 
+fn extrapolate(counts: &[usize], step: usize) -> usize {
+    if step < counts.len() {
+        counts[step]
+    } else {
+        let last_parity = (counts.len() - 1) % 2;
+        let step_parity = step % 2;
+        if step_parity == last_parity {
+            counts[counts.len() - 1]
+        } else {
+            counts[counts.len() - 2]
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Diagonal {
     start: usize,
@@ -105,6 +119,27 @@ impl Diagonal {
             sequence,
             period,
         }
+    }
+
+    fn count(&self, step: usize) -> usize {
+        if step < self.start {
+            return 0;
+        }
+
+        let mut count = 0;
+
+        let mut step = step - self.start;
+        for starts in 1.. {
+            count += extrapolate(&self.sequence, step) * starts;
+
+            if step < self.period {
+                break;
+            }
+
+            step -= self.period;
+        }
+
+        count
     }
 }
 
@@ -123,23 +158,60 @@ impl Straight {
             period,
         }
     }
+
+    fn count(&self, step: usize) -> usize {
+        if step < self.starts[0] {
+            return 0;
+        }
+
+        let mut count = 0;
+
+        for (start, sequence) in self.starts.iter().zip(self.sequences.iter()) {
+            if step < *start {
+                break;
+            }
+
+            count += extrapolate(sequence, step - *start);
+        }
+
+        let last_start = *self.starts.last().unwrap();
+        if step < last_start + self.period {
+            return count;
+        }
+
+        let last_sequence = self.sequences.last().unwrap();
+        let mut step = step - last_start - self.period;
+        loop {
+            count += extrapolate(last_sequence, step);
+            if step < self.period {
+                break;
+            }
+            step -= self.period;
+        }
+
+        count
+    }
 }
 
 #[allow(clippy::too_many_lines)]
-fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
+fn analyze_grid(
+    grid: &[Vec<u8>],
+    start: Coordinates,
+    tile_factor: usize,
+) -> (Vec<Straight>, Vec<Diagonal>) {
     let tile_height = grid.len() / tile_factor;
     let tile_width = grid[0].len() / tile_factor;
     assert_eq!(tile_width, tile_height);
-
-    let mut top_left = None;
-    let mut top_right = None;
-    let mut bottom_left = None;
-    let mut bottom_right = None;
 
     let mut straight_up = None;
     let mut straight_down = None;
     let mut straight_left = None;
     let mut straight_right = None;
+
+    let mut top_left = None;
+    let mut top_right = None;
+    let mut bottom_left = None;
+    let mut bottom_right = None;
 
     let mut first_seen = HashMap::new();
     let mut grid_first_seen = HashMap::new();
@@ -177,40 +249,7 @@ fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
             grid_fill_counts
                 .entry(*grid_cell)
                 .and_modify(|counts| counts.push(*count))
-                .or_default();
-        }
-
-        for (diagonal, coordinates) in [
-            (
-                &mut top_left,
-                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 - 1),
-            ),
-            (
-                &mut top_right,
-                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 + 1),
-            ),
-            (
-                &mut bottom_left,
-                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 - 1),
-            ),
-            (
-                &mut bottom_right,
-                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 + 1),
-            ),
-        ] {
-            if diagonal.is_some() {
-                continue;
-            }
-
-            if let Some(sequence) =
-                get_completed(grid_fill_counts.get(&coordinates).unwrap_or(&Vec::new()))
-            {
-                *diagonal = Some(Diagonal::new(
-                    *grid_first_seen.get(&coordinates).unwrap(),
-                    sequence,
-                    tile_width,
-                ));
-            }
+                .or_insert_with(|| vec![*count]);
         }
 
         for (straight, coordinates) in [
@@ -283,6 +322,39 @@ fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
             }
         }
 
+        for (diagonal, coordinates) in [
+            (
+                &mut top_left,
+                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 - 1),
+            ),
+            (
+                &mut top_right,
+                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 + 1),
+            ),
+            (
+                &mut bottom_left,
+                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 - 1),
+            ),
+            (
+                &mut bottom_right,
+                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 + 1),
+            ),
+        ] {
+            if diagonal.is_some() {
+                continue;
+            }
+
+            if let Some(sequence) =
+                get_completed(grid_fill_counts.get(&coordinates).unwrap_or(&Vec::new()))
+            {
+                *diagonal = Some(Diagonal::new(
+                    *grid_first_seen.get(&coordinates).unwrap(),
+                    sequence,
+                    tile_width,
+                ));
+            }
+        }
+
         if top_left.is_some()
             && top_right.is_some()
             && bottom_left.is_some()
@@ -292,18 +364,23 @@ fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
             && straight_left.is_some()
             && straight_right.is_some()
         {
-            println!("completed at {step}");
-            println!("top_left {top_left:?}");
-            println!("top_right {top_right:?}");
-            println!("bottom_left {bottom_left:?}");
-            println!("bottom_right {bottom_right:?}");
-            println!("straight_up {straight_up:?}");
-            println!("straight_down {straight_down:?}");
-            println!("straight_left {straight_left:?}");
-            println!("straight_right {straight_right:?}");
-            break;
+            let straights = vec![
+                straight_up.unwrap(),
+                straight_down.unwrap(),
+                straight_left.unwrap(),
+                straight_right.unwrap(),
+            ];
+            let diagonals = vec![
+                top_left.unwrap(),
+                top_right.unwrap(),
+                bottom_left.unwrap(),
+                bottom_right.unwrap(),
+            ];
+            return (straights, diagonals);
         }
     }
+
+    unreachable!()
 }
 
 fn tile_grid(grid: &[Vec<u8>], factor: usize) -> Vec<Vec<u8>> {
@@ -332,6 +409,7 @@ fn tile_grid(grid: &[Vec<u8>], factor: usize) -> Vec<Vec<u8>> {
     tiled
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -353,6 +431,8 @@ fn main() {
         .find(|(_, _, value)| *value == b'S')
         .map(|(row, column, _)| Coordinates::new(row, column))
         .unwrap();
+
+    let center_counts = get_fill_counts(&grid, start);
 
     let mut first_seen = HashMap::new();
     let mut open = vec![start];
@@ -377,14 +457,27 @@ fn main() {
         .count();
     println!("{plots}");
 
-    let tile_factor = 9;
+    let tile_factor = 13;
 
     let tiled = tile_grid(&grid, tile_factor);
 
-    let start = Coordinates::new(
+    let tiled_start = Coordinates::new(
         start.row + tile_factor / 2 * grid[0].len(),
         start.column + tile_factor / 2 * grid.len(),
     );
 
-    simulate_grid(&tiled, start, tile_factor);
+    let (straights, diagonals) = analyze_grid(&tiled, tiled_start, tile_factor);
+
+    let step_count = 26_501_365;
+    let simulated = diagonals
+        .iter()
+        .map(|diagonal| diagonal.count(step_count - 1))
+        .chain(
+            straights
+                .iter()
+                .map(|straight| straight.count(step_count - 1)),
+        )
+        .sum::<usize>()
+        + extrapolate(&center_counts, step_count - 1);
+    println!("{simulated}");
 }
