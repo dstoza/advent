@@ -77,17 +77,76 @@ fn get_fill_counts(grid: &[Vec<u8>], start: Coordinates) -> Vec<usize> {
     counts
 }
 
+fn get_completed(counts: &[usize]) -> Option<Vec<usize>> {
+    for (index, count) in counts.iter().enumerate() {
+        if index < 2 {
+            continue;
+        }
+
+        if *count == counts[index - 2] {
+            return Some(counts[..index].to_vec());
+        }
+    }
+
+    None
+}
+
+#[derive(Debug)]
+struct Diagonal {
+    start: usize,
+    sequence: Vec<usize>,
+    period: usize,
+}
+
+impl Diagonal {
+    fn new(start: usize, sequence: Vec<usize>, period: usize) -> Self {
+        Self {
+            start,
+            sequence,
+            period,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Straight {
+    starts: Vec<usize>,
+    sequences: Vec<Vec<usize>>,
+    period: usize,
+}
+
+impl Straight {
+    fn new(starts: Vec<usize>, sequences: Vec<Vec<usize>>, period: usize) -> Self {
+        Self {
+            starts,
+            sequences,
+            period,
+        }
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
     let tile_height = grid.len() / tile_factor;
     let tile_width = grid[0].len() / tile_factor;
+    assert_eq!(tile_width, tile_height);
+
+    let mut top_left = None;
+    let mut top_right = None;
+    let mut bottom_left = None;
+    let mut bottom_right = None;
+
+    let mut straight_up = None;
+    let mut straight_down = None;
+    let mut straight_left = None;
+    let mut straight_right = None;
 
     let mut first_seen = HashMap::new();
     let mut grid_first_seen = HashMap::new();
     let mut grid_fill_counts: HashMap<Coordinates, Vec<usize>> = HashMap::new();
 
     let mut open = vec![start];
-    for step in 0..120 {
+    for step in 0.. {
         let mut next = Vec::new();
         for neighbor in open.into_iter().flat_map(Coordinates::neighbors) {
             let Some(value) = neighbor.get_value(grid) else {
@@ -120,82 +179,130 @@ fn simulate_grid(grid: &[Vec<u8>], start: Coordinates, tile_factor: usize) {
                 .and_modify(|counts| counts.push(*count))
                 .or_default();
         }
-    }
 
-    println!("top left");
-    for row in 0..tile_factor / 2 {
-        for column in 0..tile_factor / 2 {
-            let fill_counts = &grid_fill_counts
-                .get(&Coordinates::new(row, column))
-                .unwrap();
-            let sliced = &fill_counts[0..6.min(fill_counts.len())];
-            print!("{sliced:2?} ");
+        for (diagonal, coordinates) in [
+            (
+                &mut top_left,
+                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 - 1),
+            ),
+            (
+                &mut top_right,
+                Coordinates::new(tile_factor / 2 - 1, tile_factor / 2 + 1),
+            ),
+            (
+                &mut bottom_left,
+                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 - 1),
+            ),
+            (
+                &mut bottom_right,
+                Coordinates::new(tile_factor / 2 + 1, tile_factor / 2 + 1),
+            ),
+        ] {
+            if diagonal.is_some() {
+                continue;
+            }
+
+            if let Some(sequence) =
+                get_completed(grid_fill_counts.get(&coordinates).unwrap_or(&Vec::new()))
+            {
+                *diagonal = Some(Diagonal::new(
+                    *grid_first_seen.get(&coordinates).unwrap(),
+                    sequence,
+                    tile_width,
+                ));
+            }
         }
-        println!();
-    }
 
-    println!("top right");
-    for row in 0..tile_factor / 2 {
-        for column in tile_factor / 2 + 1..tile_factor {
-            let fill_counts = &grid_fill_counts
-                .get(&Coordinates::new(row, column))
-                .unwrap();
-            let sliced = &fill_counts[0..6.min(fill_counts.len())];
-            print!("{sliced:2?} ");
+        for (straight, coordinates) in [
+            (
+                &mut straight_up,
+                (0..tile_factor / 2)
+                    .rev()
+                    .map(|row| Coordinates::new(row, tile_factor / 2))
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                &mut straight_down,
+                (tile_factor / 2 + 1..tile_factor)
+                    .map(|row| Coordinates::new(row, tile_factor / 2))
+                    .collect(),
+            ),
+            (
+                &mut straight_left,
+                (0..tile_factor / 2)
+                    .rev()
+                    .map(|column| Coordinates::new(tile_factor / 2, column))
+                    .collect(),
+            ),
+            (
+                &mut straight_right,
+                (tile_factor / 2 + 1..tile_factor)
+                    .map(|column| Coordinates::new(tile_factor / 2, column))
+                    .collect(),
+            ),
+        ] {
+            if straight.is_some() {
+                continue;
+            }
+
+            let candidates = coordinates
+                .iter()
+                .filter_map(|tile| {
+                    let Some(fill_counts) = grid_fill_counts
+                        .get(tile)
+                        .and_then(|counts| get_completed(counts))
+                    else {
+                        return None;
+                    };
+
+                    Some((grid_first_seen.get(tile).unwrap(), fill_counts))
+                })
+                .collect::<Vec<_>>();
+
+            for (index, (start, sequence)) in candidates.iter().enumerate() {
+                if index < 1 {
+                    continue;
+                }
+
+                if *sequence == candidates[index - 1].1 {
+                    *straight = Some(Straight::new(
+                        candidates
+                            .iter()
+                            .take(index)
+                            .map(|(start, _)| **start)
+                            .collect(),
+                        candidates
+                            .iter()
+                            .take(index)
+                            .map(|(_, sequence)| sequence)
+                            .cloned()
+                            .collect(),
+                        **start - candidates[index - 1].0,
+                    ));
+                }
+            }
         }
-        println!();
-    }
 
-    println!("bottom left");
-    for row in tile_factor / 2 + 1..tile_factor {
-        for column in 0..tile_factor / 2 {
-            let fill_counts = &grid_fill_counts
-                .get(&Coordinates::new(row, column))
-                .unwrap();
-            let sliced = &fill_counts[0..6.min(fill_counts.len())];
-            print!("{sliced:2?} ");
+        if top_left.is_some()
+            && top_right.is_some()
+            && bottom_left.is_some()
+            && bottom_right.is_some()
+            && straight_up.is_some()
+            && straight_down.is_some()
+            && straight_left.is_some()
+            && straight_right.is_some()
+        {
+            println!("completed at {step}");
+            println!("top_left {top_left:?}");
+            println!("top_right {top_right:?}");
+            println!("bottom_left {bottom_left:?}");
+            println!("bottom_right {bottom_right:?}");
+            println!("straight_up {straight_up:?}");
+            println!("straight_down {straight_down:?}");
+            println!("straight_left {straight_left:?}");
+            println!("straight_right {straight_right:?}");
+            break;
         }
-        println!();
-    }
-
-    println!("bottom right");
-    for row in tile_factor / 2 + 1..tile_factor {
-        for column in tile_factor / 2 + 1..tile_factor {
-            let fill_counts = &grid_fill_counts
-                .get(&Coordinates::new(row, column))
-                .unwrap();
-            let sliced = &fill_counts[0..6.min(fill_counts.len())];
-            print!("{sliced:2?} ");
-        }
-        println!();
-    }
-
-    println!("horizontal");
-    for column in 0..tile_factor {
-        let fill_counts = &grid_fill_counts
-            .get(&Coordinates::new(tile_factor / 2, column))
-            .unwrap();
-        let sliced = &fill_counts[0..6.min(fill_counts.len())];
-        println!("{sliced:2?} ");
-    }
-
-    println!("vertical");
-    for row in 0..tile_factor {
-        let fill_counts = &grid_fill_counts
-            .get(&Coordinates::new(row, tile_factor / 2))
-            .unwrap();
-        let sliced = &fill_counts[0..6.min(fill_counts.len())];
-        print!("{sliced:2?} ");
-
-        println!();
-    }
-
-    for row in 0..tile_factor {
-        for column in 0..tile_factor {
-            let grid_cell = Coordinates::new(row, column);
-            print!("{:3} ", grid_first_seen.get(&grid_cell).unwrap_or(&0));
-        }
-        println!();
     }
 }
 
