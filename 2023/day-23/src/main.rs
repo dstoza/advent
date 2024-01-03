@@ -97,33 +97,33 @@ fn get_entrances(grid: &[Vec<u8>], cursor: &Cursor) -> Vec<Cursor> {
     entrances
 }
 
-fn get_exits(grid: &[Vec<u8>], cursor: &Cursor) -> Vec<Cursor> {
+fn get_exits(grid: &[Vec<u8>], cursor: &Cursor, ignore_slopes: bool) -> Vec<Cursor> {
     let mut exits = Vec::new();
 
     if let Some(north) = cursor.step(Direction::North) {
         let value = north.grid_value(grid).unwrap();
-        if value != b'#' && value != b'v' {
+        if value != b'#' && (ignore_slopes || value != b'v') {
             exits.push(north);
         }
     }
 
     let east = cursor.step(Direction::East).unwrap();
     if let Some(value) = east.grid_value(grid) {
-        if value != b'#' && value != b'<' {
+        if value != b'#' && (ignore_slopes || value != b'<') {
             exits.push(east);
         }
     }
 
     let south = cursor.step(Direction::South).unwrap();
     if let Some(value) = south.grid_value(grid) {
-        if value != b'#' && value != b'^' {
+        if value != b'#' && (ignore_slopes || value != b'^') {
             exits.push(south);
         }
     }
 
     if let Some(west) = cursor.step(Direction::West) {
         let value = west.grid_value(grid).unwrap();
-        if value != b'#' && value != b'>' {
+        if value != b'#' && (ignore_slopes || value != b'>') {
             exits.push(west);
         }
     }
@@ -131,15 +131,7 @@ fn get_exits(grid: &[Vec<u8>], cursor: &Cursor) -> Vec<Cursor> {
     exits
 }
 
-fn main() {
-    let file = File::open("input.txt").unwrap();
-    let reader = BufReader::new(file);
-    let grid = reader
-        .lines()
-        .map(std::result::Result::unwrap)
-        .map(|line| line.as_bytes().to_vec())
-        .collect::<Vec<_>>();
-
+fn max_distance_with_exits(grid: &[Vec<u8>]) -> usize {
     let mut distances = vec![vec![0u16; grid[0].len()]; grid.len()];
 
     let start_column = grid[0].iter().position(|value| *value == b'.').unwrap();
@@ -150,7 +142,7 @@ fn main() {
             break;
         }
 
-        let remaining_entrances = get_entrances(&grid, &cursor)
+        let remaining_entrances = get_entrances(grid, &cursor)
             .iter()
             .filter(|entrance| entrance.grid_value(&distances).unwrap() == 0)
             .count();
@@ -162,7 +154,7 @@ fn main() {
 
         let current_distance = cursor.grid_value(&distances).unwrap();
 
-        for exit in get_exits(&grid, &cursor) {
+        for exit in get_exits(grid, &cursor, false) {
             let exit_distance = exit.grid_value_mut(&mut distances).unwrap();
             if *exit_distance == 0 {
                 *exit_distance = current_distance + 1;
@@ -171,12 +163,55 @@ fn main() {
         }
     }
 
-    let max_distance = distances
+    usize::from(
+        *distances
+            .last()
+            .unwrap()
+            .iter()
+            .find(|value| **value != 0)
+            .unwrap(),
+    )
+}
+
+fn get_junctions(grid: &[Vec<u8>]) -> Vec<Cursor> {
+    let start_column = grid[0].iter().position(|value| *value == b'.').unwrap();
+
+    let mut junctions = vec![Cursor::new(0, start_column)];
+    for row in 1..grid.len() - 1 {
+        for column in 1..grid[0].len() - 1 {
+            if grid[row][column] == b'#' {
+                continue;
+            }
+
+            let cursor = Cursor::new(row, column);
+            if get_exits(grid, &cursor, true).len() > 2 {
+                junctions.push(cursor);
+            }
+        }
+    }
+
+    let end_column = grid
         .last()
         .unwrap()
         .iter()
-        .find(|value| **value != 0)
+        .position(|value| *value == b'.')
         .unwrap();
-    
-    println!("{max_distance}");
+    junctions.push(Cursor::new(grid.len() - 1, end_column));
+
+    junctions
+}
+
+fn main() {
+    let file = File::open("input.txt").unwrap();
+    let reader = BufReader::new(file);
+    let grid = reader
+        .lines()
+        .map(std::result::Result::unwrap)
+        .map(|line| line.as_bytes().to_vec())
+        .collect::<Vec<_>>();
+
+    println!("{}", max_distance_with_exits(&grid));
+
+    let junctions = get_junctions(&grid);
+    println!("{} junctions", junctions.len());
 }
