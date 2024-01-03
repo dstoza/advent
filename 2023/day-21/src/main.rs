@@ -411,6 +411,8 @@ fn tile_grid(grid: &[Vec<u8>], factor: usize) -> Vec<Vec<u8>> {
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    const TILE_FACTOR: usize = 9;
+
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
 
@@ -432,52 +434,27 @@ fn main() {
         .map(|(row, column, _)| Coordinates::new(row, column))
         .unwrap();
 
-    let center_counts = get_fill_counts(&grid, start);
-
-    let mut first_seen = HashMap::new();
-    let mut open = vec![start];
-    for step in 1..=64 {
-        let mut next = Vec::new();
-        for neighbor in open.into_iter().flat_map(Coordinates::neighbors) {
-            let Some(value) = neighbor.get_value(&grid) else {
-                continue;
-            };
-
-            if value != b'#' && !first_seen.contains_key(&neighbor) {
-                first_seen.insert(neighbor, step);
-                next.push(neighbor);
-            }
-        }
-        open = next;
-    }
-
-    let plots = first_seen
-        .iter()
-        .filter(|(_, first)| **first % 2 == 0)
-        .count();
-    println!("{plots}");
-
-    let tile_factor = 13;
-
-    let tiled = tile_grid(&grid, tile_factor);
+    let tiled = tile_grid(&grid, TILE_FACTOR);
 
     let tiled_start = Coordinates::new(
-        start.row + tile_factor / 2 * grid[0].len(),
-        start.column + tile_factor / 2 * grid.len(),
+        start.row + TILE_FACTOR / 2 * grid[0].len(),
+        start.column + TILE_FACTOR / 2 * grid.len(),
     );
 
-    let (straights, diagonals) = analyze_grid(&tiled, tiled_start, tile_factor);
+    let (straights, diagonals) = analyze_grid(&tiled, tiled_start, TILE_FACTOR);
+    let center_counts = get_fill_counts(&grid, start);
 
-    let step_count = 26_501_365;
-    let simulated = diagonals
-        .iter()
-        .map(|diagonal| diagonal.count(step_count - 1))
-        .chain(
-            straights
-                .iter()
-                .map(|straight| straight.count(step_count - 1)),
-        )
-        .sum::<usize>()
-        + extrapolate(&center_counts, step_count - 1);
-    println!("{simulated}");
+    for step_count in [64, 26_501_365] {
+        let simulated = diagonals
+            .iter()
+            .map(|diagonal| diagonal.count(step_count - 1))
+            .chain(
+                straights
+                    .iter()
+                    .map(|straight| straight.count(step_count - 1)),
+            )
+            .sum::<usize>()
+            + extrapolate(&center_counts, step_count - 1);
+        println!("{simulated}");
+    }
 }
