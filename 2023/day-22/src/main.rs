@@ -70,6 +70,7 @@ struct Tower {
     top: Vec<(u16, Option<usize>)>,
     supporters: HashMap<usize, HashSet<usize>>,
     essential: HashSet<usize>,
+    essential_cache: HashMap<usize, HashSet<usize>>,
     seen: usize,
 }
 
@@ -80,6 +81,7 @@ impl Tower {
             top: vec![(0, None); usize::from(width * height)],
             supporters: HashMap::new(),
             essential: HashSet::new(),
+            essential_cache: HashMap::new(),
             seen: 0,
         }
     }
@@ -109,14 +111,17 @@ impl Tower {
         for cube in brick.bottom_cubes() {
             let (x, y, z) = cube;
             let (height, below) = *self.cell(x, y);
-            if height == z - 1 && below.is_some() {
-                supporters.insert(below.unwrap());
+            let Some(below) = below else {
+                continue;
+            };
+            if height == z - 1 {
+                supporters.insert(below);
                 self.supporters
                     .entry(index)
                     .and_modify(|supporters| {
-                        supporters.insert(below.unwrap());
+                        supporters.insert(below);
                     })
-                    .or_insert_with(|| HashSet::from([below.unwrap()]));
+                    .or_insert_with(|| HashSet::from([below]));
             }
         }
 
@@ -128,6 +133,43 @@ impl Tower {
             let (x, y, z) = cube;
             *self.cell_mut(x, y) = (z, Some(index));
         }
+    }
+
+    fn get_essential(&mut self, block: usize) -> HashSet<usize> {
+        if let Some(essential) = self.essential_cache.get(&block) {
+            return essential.clone();
+        }
+
+        let mut essential = HashSet::new();
+        let mut common = HashSet::new();
+        if let Some(supporters) = self.supporters.get(&block).cloned() {
+            for (index, supporter) in supporters.iter().enumerate() {
+                if supporters.len() == 1 {
+                    essential.insert(*supporter);
+                }
+
+                if index == 0 {
+                    common = self.get_essential(*supporter);
+                } else {
+                    common = common
+                        .intersection(&self.get_essential(*supporter))
+                        .copied()
+                        .collect();
+                }
+            }
+        }
+
+        let essential: HashSet<_> = essential.union(&common).copied().collect();
+        self.essential_cache.insert(block, essential.clone());
+        essential
+    }
+
+    fn get_each_essential(&mut self) -> HashMap<usize, HashSet<usize>> {
+        let mut essential = HashMap::new();
+        for block in 0..self.seen {
+            essential.insert(block, self.get_essential(block));
+        }
+        essential
     }
 }
 
@@ -162,5 +204,12 @@ fn main() {
     }
 
     let redundant = tower.seen - tower.essential.len();
-    println!("redundant: {redundant}");
+    println!("{redundant}");
+
+    let each_essential = tower.get_each_essential();
+    let falling_sum: usize = each_essential
+        .values()
+        .map(std::collections::HashSet::len)
+        .sum();
+    println!("{falling_sum}");
 }
