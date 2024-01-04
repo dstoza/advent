@@ -134,23 +134,80 @@ fn main() {
     let a = rays[0].clone();
     let b = rays[1].clone();
 
-    // Magic values obtained from manually iterating using the loop below
-    let t_a = 353_090_968_659f64;
-    let t_b = 870_093_641_616f64;
+    let mut t_a = 0;
+    let mut t_b = 0;
+    let mut step_size = 1_000_000_000_000i64;
+    #[allow(clippy::cast_precision_loss)]
+    while step_size > 0 {
+        println!("stepping by {step_size} {t_a} {t_b}");
 
-    // for t_b in (870093640616i64..).take(1_000_000) {
-    //     let a_at_t = a.origin + t_a as f64 * a.direction;
-    //     let b_at_t = b.origin + t_b as f64 * b.direction;
-    //     let projected = Ray::new(a_at_t, b_at_t - a_at_t);
-    //     let distance: f64 = rays[3..]
-    //         .iter()
-    //         .filter_map(|ray| projected.distance(ray))
-    //         .sum();
+        t_a = (t_a - step_size * 10).max(0);
+        t_b = (t_b - step_size * 10).max(0);
 
-    //     println!("{t_a} {t_b} {distance:?}");
-    // }
+        let a_at_t = a.origin + t_a as f64 * a.direction;
+        let b_at_t = b.origin + t_b as f64 * b.direction;
+        let projected = Ray::new(a_at_t, b_at_t - a_at_t);
+        let average_distance = rays[2..]
+            .iter()
+            .filter_map(|ray| projected.distance(ray))
+            .sum::<f64>()
+            / rays[2..].len() as f64;
 
-    // Given the magic values, figure out the initial position
+        let mut best_distance = average_distance;
+        println!("{best_distance}");
+
+        loop {
+            let step_t_a = t_a + step_size;
+            let a_at_t = a.origin + step_t_a as f64 * a.direction;
+            let projected = Ray::new(a_at_t, b_at_t - a_at_t);
+            let step_distance = rays[2..]
+                .iter()
+                .filter_map(|ray| projected.distance(ray))
+                .sum::<f64>()
+                / rays[2..].len() as f64;
+            println!("a {step_t_a} {t_b} {step_distance}");
+
+            if step_distance > best_distance {
+                break;
+            }
+
+            best_distance = step_distance;
+
+            t_a = step_t_a;
+        }
+
+        let a_at_t = a.origin + t_a as f64 * a.direction;
+
+        loop {
+            let step_t_b = t_b + step_size;
+            let b_at_t = b.origin + step_t_b as f64 * b.direction;
+            let projected = Ray::new(a_at_t, b_at_t - a_at_t);
+            let step_distance = rays[2..]
+                .iter()
+                .filter_map(|ray| projected.distance(ray))
+                .sum::<f64>()
+                / rays[2..].len() as f64;
+            println!("b {t_a} {step_t_b} {step_distance}");
+
+            if step_distance > best_distance {
+                break;
+            }
+
+            best_distance = step_distance;
+
+            t_b = step_t_b;
+        }
+
+        step_size /= 10;
+    }
+
+    println!("found {t_a} {t_b}");
+
+    #[allow(clippy::cast_precision_loss)]
+    let t_a = t_a as f64;
+    #[allow(clippy::cast_precision_loss)]
+    let t_b = t_b as f64;
+
     let a_at_t = a.origin + t_a * a.direction;
     let b_at_t = b.origin + t_b * b.direction;
     let projected = Ray::new(a_at_t, (b_at_t - a_at_t) / (t_b - t_a));
