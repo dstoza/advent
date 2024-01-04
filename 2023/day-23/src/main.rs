@@ -14,7 +14,7 @@ enum Direction {
     West,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Cursor {
     row: usize,
     column: usize,
@@ -201,6 +201,36 @@ fn get_junctions(grid: &[Vec<u8>]) -> Vec<Cursor> {
     junctions
 }
 
+fn get_junction_connections(grid: &[Vec<u8>], junctions: &[Cursor]) -> Vec<Vec<(usize, u16)>> {
+    junctions
+        .iter()
+        .map(|junction| {
+            get_exits(grid, junction, true)
+                .into_iter()
+                .map(|exit| {
+                    let mut visited = vec![*junction];
+                    let mut current = exit;
+                    loop {
+                        visited.push(current);
+                        if let Some(position) =
+                            junctions.iter().position(|junction| *junction == current)
+                        {
+                            return (position, u16::try_from(visited.len()).unwrap() - 1);
+                        }
+
+                        for next in get_exits(grid, &current, true) {
+                            if !visited.iter().rev().any(|v| *v == next) {
+                                current = next;
+                                break;
+                            }
+                        }
+                    }
+                })
+                .collect()
+        })
+        .collect::<Vec<_>>()
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -214,4 +244,14 @@ fn main() {
 
     let junctions = get_junctions(&grid);
     println!("{} junctions", junctions.len());
+
+    let junction_connections = get_junction_connections(&grid, &junctions);
+
+    for (index, (junction, connections)) in junctions
+        .iter()
+        .zip(junction_connections.iter())
+        .enumerate()
+    {
+        println!("{index} {junction:?} {connections:?}");
+    }
 }
