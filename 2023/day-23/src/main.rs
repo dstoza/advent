@@ -6,6 +6,8 @@ use std::{
     io::{BufRead, BufReader},
 };
 
+use bitvec::prelude::*;
+
 #[derive(Clone, Copy)]
 enum Direction {
     North,
@@ -131,7 +133,7 @@ fn get_exits(grid: &[Vec<u8>], cursor: &Cursor, ignore_slopes: bool) -> Vec<Curs
     exits
 }
 
-fn max_distance_with_exits(grid: &[Vec<u8>]) -> usize {
+fn max_distance_with_slopes(grid: &[Vec<u8>]) -> usize {
     let mut distances = vec![vec![0u16; grid[0].len()]; grid.len()];
 
     let start_column = grid[0].iter().position(|value| *value == b'.').unwrap();
@@ -231,6 +233,33 @@ fn get_junction_connections(grid: &[Vec<u8>], junctions: &[Cursor]) -> Vec<Vec<(
         .collect::<Vec<_>>()
 }
 
+fn get_longest_path(
+    available: BitArray,
+    connections: &[Vec<(usize, u16)>],
+    from: usize,
+    to: usize,
+) -> Option<usize> {
+    // println!("{:b} {from} {to}", available.data[0]);
+
+    if from == to {
+        return Some(0);
+    }
+
+    let mut without_self = available;
+    without_self.set(from, false);
+    connections[from]
+        .iter()
+        .filter_map(|(connection, distance)| {
+            if !without_self[*connection] {
+                return None;
+            }
+
+            get_longest_path(without_self, connections, *connection, to)
+                .map(|connection_longest| connection_longest + usize::from(*distance))
+        })
+        .max()
+}
+
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
@@ -240,18 +269,19 @@ fn main() {
         .map(|line| line.as_bytes().to_vec())
         .collect::<Vec<_>>();
 
-    println!("{}", max_distance_with_exits(&grid));
+    println!("{}", max_distance_with_slopes(&grid));
 
     let junctions = get_junctions(&grid);
-    println!("{} junctions", junctions.len());
 
     let junction_connections = get_junction_connections(&grid, &junctions);
 
-    for (index, (junction, connections)) in junctions
-        .iter()
-        .zip(junction_connections.iter())
-        .enumerate()
-    {
-        println!("{index} {junction:?} {connections:?}");
+    let mut available = bitarr![0; 64];
+    for bit in 1..junctions.len() {
+        available.set(bit, true);
     }
+
+    println!(
+        "{}",
+        get_longest_path(available, &junction_connections, 0, junctions.len() - 1).unwrap()
+    );
 }
