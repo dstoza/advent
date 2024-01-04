@@ -139,8 +139,6 @@ fn main() {
     let mut step_size = 1_000_000_000_000i64;
     #[allow(clippy::cast_precision_loss)]
     while step_size > 0 {
-        println!("stepping by {step_size} {t_a} {t_b}");
-
         t_a = (t_a - step_size * 10).max(0);
         t_b = (t_b - step_size * 10).max(0);
 
@@ -154,7 +152,6 @@ fn main() {
             / rays[2..].len() as f64;
 
         let mut best_distance = average_distance;
-        println!("{best_distance}");
 
         loop {
             let step_t_a = t_a + step_size;
@@ -165,7 +162,6 @@ fn main() {
                 .filter_map(|ray| projected.distance(ray))
                 .sum::<f64>()
                 / rays[2..].len() as f64;
-            println!("a {step_t_a} {t_b} {step_distance}");
 
             if step_distance > best_distance {
                 break;
@@ -187,7 +183,6 @@ fn main() {
                 .filter_map(|ray| projected.distance(ray))
                 .sum::<f64>()
                 / rays[2..].len() as f64;
-            println!("b {t_a} {step_t_b} {step_distance}");
 
             if step_distance > best_distance {
                 break;
@@ -200,8 +195,6 @@ fn main() {
 
         step_size /= 10;
     }
-
-    println!("found {t_a} {t_b}");
 
     #[allow(clippy::cast_precision_loss)]
     let t_a = t_a as f64;
