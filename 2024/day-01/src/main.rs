@@ -26,8 +26,8 @@ fn main() {
         .map(|line| {
             let mut split = line.split_whitespace();
             (
-                split.next().unwrap().parse::<i32>().unwrap(),
-                split.next().unwrap().parse::<i32>().unwrap(),
+                split.next().unwrap().parse::<isize>().unwrap(),
+                split.next().unwrap().parse::<isize>().unwrap(),
             )
         })
         .unzip();
@@ -35,15 +35,15 @@ fn main() {
     left.sort_unstable();
     right.sort_unstable();
 
-    let difference: u32 = left
+    let distance: usize = left
         .iter()
         .zip(right.iter())
         .map(|(l, r)| l.abs_diff(*r))
         .sum();
 
-    println!("difference {difference}");
+    println!("distance {distance}");
 
-    let mut frequencies: HashMap<i32, _> = HashMap::new();
+    let mut frequencies = HashMap::new();
     for r in right {
         frequencies
             .entry(r)
@@ -53,7 +53,7 @@ fn main() {
 
     let similarity: isize = left
         .iter()
-        .map(|l| (*l as isize) * frequencies.get(l).copied().unwrap_or(0))
+        .map(|l| *l * frequencies.get(l).copied().unwrap_or(0))
         .sum();
 
     println!("similarity {similarity}");
