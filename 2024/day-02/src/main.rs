@@ -34,7 +34,7 @@ fn main() {
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
-    let count: usize = reader
+    let safe_reports: usize = reader
         .lines()
         .map(Result::unwrap)
         .filter(|line| {
@@ -62,5 +62,5 @@ fn main() {
         })
         .count();
 
-    println!("safe {count}");
+    println!("safe {safe_reports}");
 }
