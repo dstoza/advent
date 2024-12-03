@@ -25,7 +25,7 @@ fn is_safe(report: &[u32]) -> bool {
 
     report
         .windows(2)
-        .all(|chunk| (1..=3).contains(&(chunk[0].abs_diff(chunk[1]))))
+        .all(|window| (1..=3).contains(&(window[0].abs_diff(window[1]))))
 }
 
 fn main() {
