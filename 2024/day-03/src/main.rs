@@ -24,15 +24,14 @@ fn main() {
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
-    let token_regex = Regex::new(r"mul\(\d{1,3},\d{1,3}\)|don't\(\)|do\(\)").unwrap();
-    let mul_regex = Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)").unwrap();
+    let token_regex = Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)|don't\(\)|do\(\)").unwrap();
 
     let lines = reader.lines().map(Result::unwrap);
     let mut enabled = true;
     let mut sum = 0;
     for line in lines {
-        for token in token_regex.find_iter(&line) {
-            let token = token.as_str();
+        for capture in token_regex.captures_iter(&line) {
+            let token = &capture[0];
             match token {
                 "don't()" => enabled = false,
                 "do()" => enabled = true,
@@ -40,9 +39,8 @@ fn main() {
                     if args.part == 2 && !enabled {
                         continue;
                     }
-                    let (_, [left, right]) = mul_regex.captures(token).unwrap().extract();
-                    let left = left.parse::<u32>().unwrap();
-                    let right = right.parse::<u32>().unwrap();
+                    let left = capture[1].parse::<u32>().unwrap();
+                    let right = capture[2].parse::<u32>().unwrap();
                     sum += left * right;
                 }
             }
