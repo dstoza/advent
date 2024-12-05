@@ -1,7 +1,6 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::HashSet,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -41,17 +40,15 @@ fn get_topological_sort(edges: &[(u16, u16)], nodes: &[u16]) -> Vec<u16> {
     // Implementation of Kahn's algorithm
     // https://en.wikipedia.org/wiki/Topological_sorting#Kahn%27s_algorithm
 
-    let mut no_incoming = HashSet::new();
+    let mut no_incoming = Vec::new();
     for node in nodes {
         if edges.iter().all(|(_from, to)| to != node) {
-            no_incoming.insert(*node);
+            no_incoming.push(*node);
         }
     }
 
     let mut sorted = Vec::new();
-    while !no_incoming.is_empty() {
-        let node = *no_incoming.iter().next().unwrap();
-        no_incoming.remove(&node);
+    while let Some(node) = no_incoming.pop() {
         sorted.push(node);
 
         let edges_to_remove = edges
@@ -64,7 +61,7 @@ fn get_topological_sort(edges: &[(u16, u16)], nodes: &[u16]) -> Vec<u16> {
             edges.retain(|e| *e != edge);
             let (_from, to) = edge;
             if edges.iter().all(|(_f, t)| t != to) {
-                no_incoming.insert(*to);
+                no_incoming.push(*to);
             }
         }
     }
