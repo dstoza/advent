@@ -59,6 +59,7 @@ fn get_topological_sort(edges: &[(u16, u16)], nodes: &[u16]) -> Vec<u16> {
 
         for edge in edges_to_remove {
             edges.retain(|e| *e != edge);
+
             let (_from, to) = edge;
             if edges.iter().all(|(_f, t)| t != to) {
                 no_incoming.push(*to);
