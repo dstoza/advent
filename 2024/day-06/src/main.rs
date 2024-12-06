@@ -8,7 +8,7 @@ use std::{
 
 use clap::Parser;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 enum Direction {
     Up,
     Right,
@@ -80,9 +80,40 @@ fn get_start_position(grid: &[Vec<u8>]) -> (usize, usize) {
     position
 }
 
-fn get_next(grid: &[Vec<u8>], position: (usize, usize), direction: Direction) -> u8 {
-    let (next_row, next_column) = direction.step(position);
+fn get_next(
+    grid: &[Vec<u8>],
+    position: (usize, usize),
+    direction: Direction,
+    obstruction: Option<(usize, usize)>,
+) -> u8 {
+    let step = direction.step(position);
+    if let Some(obstruction) = obstruction {
+        if step == obstruction {
+            return b'#';
+        }
+    }
+
+    let (next_row, next_column) = step;
     grid[next_row][next_column]
+}
+
+fn has_cycle(grid: &[Vec<u8>], mut position: (usize, usize), obstruction: (usize, usize)) -> bool {
+    let mut visited = HashSet::new();
+    let mut direction = Direction::Up;
+    while grid[position.0][position.1] != b'*' {
+        if visited.contains(&(position, direction)) {
+            return true;
+        }
+        visited.insert((position, direction));
+
+        while get_next(grid, position, direction, Some(obstruction)) == b'#' {
+            direction = direction.rotate();
+        }
+
+        position = direction.step(position);
+    }
+
+    false
 }
 
 fn main() {
@@ -92,17 +123,26 @@ fn main() {
     let reader = BufReader::new(file);
     let grid = parse_padded_grid(reader.lines().map(Result::unwrap));
 
-    let mut position = get_start_position(&grid);
+    let start_position = get_start_position(&grid);
+    let mut position = start_position;
     let mut visited = HashSet::new();
     let mut direction = Direction::Up;
     while grid[position.0][position.1] != b'*' {
         visited.insert(position);
-        while get_next(&grid, position, direction) == b'#' {
+        while get_next(&grid, position, direction, None) == b'#' {
             direction = direction.rotate();
         }
 
         position = direction.step(position);
     }
 
+    let mut count = 0;
+    for obstruction in &visited {
+        if has_cycle(&grid, start_position, *obstruction) {
+            count += 1;
+        }
+    }
+
     println!("{}", visited.len());
+    println!("{count}");
 }
