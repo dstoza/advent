@@ -46,20 +46,10 @@ struct Args {
     filename: String,
 }
 
-fn get_next(grid: &[Vec<u8>], position: (usize, usize), direction: Direction) -> u8 {
-    let (next_row, next_column) = direction.step(position);
-    grid[next_row][next_column]
-}
-
-fn main() {
-    let args = Args::parse();
-
-    let file = File::open(args.filename).unwrap();
-    let reader = BufReader::new(file);
-
+fn parse_padded_grid(lines: impl Iterator<Item = String>) -> Vec<Vec<u8>> {
     let mut grid = Vec::new();
 
-    for line in reader.lines().map(Result::unwrap) {
+    for line in lines {
         let mut bytes = vec![b'*'];
         bytes.extend_from_slice(line.as_bytes());
         bytes.push(b'*');
@@ -73,6 +63,10 @@ fn main() {
 
     grid.push(grid[0].clone());
 
+    grid
+}
+
+fn get_start_position(grid: &[Vec<u8>]) -> (usize, usize) {
     let mut position = (0, 0);
     for (row_index, row) in grid.iter().enumerate() {
         for (column_index, cell) in row.iter().enumerate() {
@@ -83,6 +77,22 @@ fn main() {
         }
     }
 
+    position
+}
+
+fn get_next(grid: &[Vec<u8>], position: (usize, usize), direction: Direction) -> u8 {
+    let (next_row, next_column) = direction.step(position);
+    grid[next_row][next_column]
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let file = File::open(args.filename).unwrap();
+    let reader = BufReader::new(file);
+    let grid = parse_padded_grid(reader.lines().map(Result::unwrap));
+
+    let mut position = get_start_position(&grid);
     let mut visited = HashSet::new();
     let mut direction = Direction::Up;
     while grid[position.0][position.1] != b'*' {
