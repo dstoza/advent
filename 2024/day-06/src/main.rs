@@ -2,13 +2,14 @@
 
 use std::{
     collections::HashSet,
+    fmt::{Debug, Display},
     fs::File,
     io::{BufRead, BufReader},
 };
 
 use clap::Parser;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum Direction {
     Up,
     Right,
@@ -33,6 +34,191 @@ impl Direction {
             Self::Down => Self::Left,
             Self::Left => Self::Up,
         }
+    }
+}
+
+#[derive(Clone, Default)]
+struct PackedSortedVecs<T>
+where
+    T: Default,
+{
+    stride: usize,
+    data: Vec<T>,
+    lengths: Vec<usize>,
+}
+
+impl<T> PackedSortedVecs<T>
+where
+    T: Default + Copy + Ord,
+{
+    fn new() -> Self {
+        Self {
+            stride: 1,
+            ..Self::default()
+        }
+    }
+
+    fn get(&self, vec: usize) -> &[T] {
+        &self.data[(vec * self.stride)..(vec * self.stride + self.lengths[vec])]
+    }
+
+    fn restride(&mut self, stride: usize) {
+        let mut new_data = Vec::with_capacity(self.lengths.len() * stride);
+        new_data.resize(self.lengths.len() * stride, T::default());
+
+        for vec in 0..self.lengths.len() {
+            let source = &self.data[(vec * self.stride)..((vec + 1) * self.stride)];
+            let destination = &mut new_data[(vec * stride)..(vec * stride + self.stride)];
+            destination.copy_from_slice(source);
+        }
+
+        self.data = new_data;
+        self.stride = stride;
+    }
+
+    fn insert(&mut self, vec: usize, value: T) {
+        if vec >= self.lengths.len() {
+            self.lengths.resize(vec + 1, 0);
+            self.data.resize((vec + 1) * self.stride, T::default());
+        }
+
+        if self.lengths[vec] == self.stride {
+            self.restride(self.stride + 1);
+        }
+
+        self.data[vec * self.stride + self.lengths[vec]] = value;
+        self.lengths[vec] += 1;
+        self.data[vec * self.stride..(vec * self.stride + self.lengths[vec])].sort_unstable();
+    }
+}
+
+impl<T> Display for PackedSortedVecs<T>
+where
+    T: Debug + Default,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for vec in 0..self.lengths.len() {
+            if vec != 0 {
+                f.write_str("\n")?;
+            }
+
+            f.write_fmt(format_args!(
+                "{:?}",
+                &self.data[vec * self.stride..(vec * self.stride + self.lengths[vec])]
+            ))?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct CycleDetector {
+    start_row: usize,
+    start_column: usize,
+    by_row: PackedSortedVecs<usize>,
+    by_column: PackedSortedVecs<usize>,
+}
+
+impl CycleDetector {
+    fn new(grid: &[Vec<u8>]) -> Self {
+        let mut start_row = 0;
+        let mut start_column = 0;
+        let mut by_row = PackedSortedVecs::new();
+        let mut by_column = PackedSortedVecs::new();
+
+        for (row, line) in grid.iter().enumerate() {
+            for (column, cell) in line.iter().enumerate() {
+                match *cell {
+                    b'^' => {
+                        start_row = row;
+                        start_column = column;
+                    }
+                    b'#' => {
+                        by_row.insert(row, column);
+                        by_column.insert(column, row);
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        Self {
+            start_row,
+            start_column,
+            by_row,
+            by_column,
+        }
+    }
+
+    fn insert_obstruction(&mut self, row: usize, column: usize) {
+        self.by_row.insert(row, column);
+        self.by_column.insert(column, row);
+    }
+
+    fn get_next(
+        &self,
+        row: usize,
+        column: usize,
+        direction: Direction,
+    ) -> Option<((usize, usize), Direction)> {
+        match direction {
+            Direction::Up => {
+                let data = self.by_column.get(column);
+                let point = data.partition_point(|value| *value < row);
+                if point == 0 {
+                    None
+                } else {
+                    Some(((data[point - 1] + 1, column), direction.rotate()))
+                }
+            }
+            Direction::Right => {
+                let data = self.by_row.get(row);
+                let point = data.partition_point(|value| *value < column);
+                if point == data.len() {
+                    None
+                } else {
+                    Some(((row, data[point] - 1), direction.rotate()))
+                }
+            }
+            Direction::Down => {
+                let data = self.by_column.get(column);
+                let point = data.partition_point(|value| *value < row);
+                if point == data.len() {
+                    None
+                } else {
+                    Some(((data[point] - 1, column), direction.rotate()))
+                }
+            }
+            Direction::Left => {
+                let data = self.by_row.get(row);
+                let point = data.partition_point(|value| *value < column);
+                if point == 0 {
+                    None
+                } else {
+                    Some(((row, data[point - 1] + 1), direction.rotate()))
+                }
+            }
+        }
+    }
+
+    fn has_cycle(&self, obstruction_row: usize, obstruction_column: usize) -> bool {
+        let mut obstructed = self.clone();
+        obstructed.insert_obstruction(obstruction_row, obstruction_column);
+
+        let mut row = self.start_row;
+        let mut column = self.start_column;
+        let mut direction = Direction::Up;
+        let mut visited = HashSet::from([((self.start_row, self.start_column), Direction::Up)]);
+        while let Some(next) = obstructed.get_next(row, column, direction) {
+            if visited.contains(&next) {
+                return true;
+            }
+
+            visited.insert(next);
+            ((row, column), direction) = next;
+        }
+
+        false
     }
 }
 
@@ -97,25 +283,6 @@ fn get_next(
     grid[next_row][next_column]
 }
 
-fn has_cycle(grid: &[Vec<u8>], mut position: (usize, usize), obstruction: (usize, usize)) -> bool {
-    let mut visited = HashSet::new();
-    let mut direction = Direction::Up;
-    while grid[position.0][position.1] != b'*' {
-        if visited.contains(&(position, direction)) {
-            return true;
-        }
-        visited.insert((position, direction));
-
-        while get_next(grid, position, direction, Some(obstruction)) == b'#' {
-            direction = direction.rotate();
-        }
-
-        position = direction.step(position);
-    }
-
-    false
-}
-
 fn main() {
     let args = Args::parse();
 
@@ -136,9 +303,10 @@ fn main() {
         position = direction.step(position);
     }
 
+    let cycle_detector = CycleDetector::new(&grid);
     let mut count = 0;
-    for obstruction in &visited {
-        if has_cycle(&grid, start_position, *obstruction) {
+    for (obstruction_row, obstruction_column) in &visited {
+        if cycle_detector.has_cycle(*obstruction_row, *obstruction_column) {
             count += 1;
         }
     }
