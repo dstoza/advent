@@ -39,7 +39,7 @@ fn parse(lines: impl Iterator<Item = String>) -> Vec<(u64, Vec<u64>)> {
     result
 }
 
-const OPERATIONS: &[&str] = &["+", "*", "||"];
+const OPERATIONS: &[&str] = &["||", "*", "+"];
 
 fn is_possible(
     accumulator: u64,
