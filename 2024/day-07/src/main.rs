@@ -39,7 +39,16 @@ fn parse(lines: impl Iterator<Item = String>) -> Vec<(u64, Vec<u64>)> {
     result
 }
 
-fn is_possible(accumulator: u64, target: u64, terms: &[u64], operation: &str) -> bool {
+const PART_1_OPERATIONS: &[&str] = &["+", "*"];
+const PART_2_OPERATIONS: &[&str] = &["+", "*", "||"];
+
+fn is_possible(
+    accumulator: u64,
+    target: u64,
+    operations: &[&str],
+    terms: &[u64],
+    operation: &str,
+) -> bool {
     if terms.is_empty() {
         return accumulator == target;
     }
@@ -49,24 +58,32 @@ fn is_possible(accumulator: u64, target: u64, terms: &[u64], operation: &str) ->
     }
 
     match operation {
-        "+" => {
-            is_possible(accumulator + terms[0], target, &terms[1..], "+")
-                || is_possible(accumulator + terms[0], target, &terms[1..], "*")
-                || is_possible(accumulator + terms[0], target, &terms[1..], "||")
-        }
-        "*" => {
-            is_possible(accumulator * terms[0], target, &terms[1..], "+")
-                || is_possible(accumulator * terms[0], target, &terms[1..], "*")
-                || is_possible(accumulator * terms[0], target, &terms[1..], "||")
-        }
+        "+" => operations.iter().any(|operation| {
+            is_possible(
+                accumulator + terms[0],
+                target,
+                operations,
+                &terms[1..],
+                operation,
+            )
+        }),
+        "*" => operations.iter().any(|operation| {
+            is_possible(
+                accumulator * terms[0],
+                target,
+                operations,
+                &terms[1..],
+                operation,
+            )
+        }),
         "||" => {
             let shift = 10f64
                 .powi(((terms[0] + 1) as f64).log10().ceil().round() as i32)
                 .round() as u64;
             let concatenated = accumulator * shift + terms[0];
-            is_possible(concatenated, target, &terms[1..], "+")
-                || is_possible(concatenated, target, &terms[1..], "*")
-                || is_possible(concatenated, target, &terms[1..], "||")
+            operations.iter().any(|operation| {
+                is_possible(concatenated, target, operations, &terms[1..], operation)
+            })
         }
         _ => unreachable!(),
     }
@@ -78,10 +95,16 @@ fn main() {
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
+    let operations = if args.part == 1 {
+        PART_1_OPERATIONS
+    } else {
+        PART_2_OPERATIONS
+    };
+
     let parsed = parse(reader.lines().map(Result::unwrap));
     let mut total = 0;
     for (value, terms) in parsed {
-        if is_possible(0, value, &terms, "+") {
+        if is_possible(0, value, operations, &terms, "+") {
             total += value;
         }
     }
