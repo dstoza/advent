@@ -39,18 +39,21 @@ fn parse(lines: impl Iterator<Item = String>) -> Vec<(u64, Vec<u64>)> {
     result
 }
 
-const PART_1_OPERATIONS: &[&str] = &["+", "*"];
-const PART_2_OPERATIONS: &[&str] = &["+", "*", "||"];
+const OPERATIONS: &[&str] = &["+", "*", "||"];
 
 fn is_possible(
     accumulator: u64,
     target: u64,
-    operations: &[&str],
     terms: &[u64],
     operation: &str,
+    allow_concatenation: bool,
 ) -> bool {
     if terms.is_empty() {
         return accumulator == target;
+    }
+
+    if !allow_concatenation && operation == "||" {
+        return false;
     }
 
     if accumulator > target {
@@ -58,22 +61,22 @@ fn is_possible(
     }
 
     match operation {
-        "+" => operations.iter().any(|operation| {
+        "+" => OPERATIONS.iter().any(|operation| {
             is_possible(
                 accumulator + terms[0],
                 target,
-                operations,
                 &terms[1..],
                 operation,
+                allow_concatenation,
             )
         }),
-        "*" => operations.iter().any(|operation| {
+        "*" => OPERATIONS.iter().any(|operation| {
             is_possible(
                 accumulator * terms[0],
                 target,
-                operations,
                 &terms[1..],
                 operation,
+                allow_concatenation,
             )
         }),
         "||" => {
@@ -81,8 +84,14 @@ fn is_possible(
                 .powi(((terms[0] + 1) as f64).log10().ceil().round() as i32)
                 .round() as u64;
             let concatenated = accumulator * shift + terms[0];
-            operations.iter().any(|operation| {
-                is_possible(concatenated, target, operations, &terms[1..], operation)
+            OPERATIONS.iter().any(|operation| {
+                is_possible(
+                    concatenated,
+                    target,
+                    &terms[1..],
+                    operation,
+                    allow_concatenation,
+                )
             })
         }
         _ => unreachable!(),
@@ -95,16 +104,10 @@ fn main() {
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
-    let operations = if args.part == 1 {
-        PART_1_OPERATIONS
-    } else {
-        PART_2_OPERATIONS
-    };
-
     let parsed = parse(reader.lines().map(Result::unwrap));
     let mut total = 0;
     for (value, terms) in parsed {
-        if is_possible(0, value, operations, &terms, "+") {
+        if is_possible(0, value, &terms, "+", args.part == 2) {
             total += value;
         }
     }
