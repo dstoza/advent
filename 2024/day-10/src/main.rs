@@ -47,32 +47,27 @@ fn neighbors(row: usize, column: usize) -> [(usize, usize); 4] {
     ]
 }
 
-fn count_score(grid: &[Vec<u8>], row: usize, column: usize) -> usize {
-    if grid[row][column] != b'0' {
-        return 0;
+fn extend(grid: &[Vec<u8>], paths: Vec<Vec<(usize, usize)>>) -> Vec<Vec<(usize, usize)>> {
+    if paths.is_empty() {
+        return Vec::new();
     }
 
-    let mut frontier = HashSet::from(neighbors(row, column));
-    let mut next = b'1';
+    let (end_row, end_column) = paths[0].last().unwrap();
+    let next_value = grid[*end_row][*end_column] + 1;
 
-    while !frontier.is_empty() && next < b'9' {
-        frontier = frontier
-            .into_iter()
-            .filter(|(row, column)| {
-                (0..grid.len()).contains(row)
-                    && (0..grid[*row].len()).contains(column)
-                    && grid[*row][*column] == next
-            })
-            .flat_map(|(row, column)| neighbors(row, column))
-            .collect::<HashSet<_>>();
-
-        next += 1;
+    let mut extended_paths = Vec::new();
+    for path in paths {
+        let (end_row, end_column) = path.last().unwrap();
+        for (row, column) in neighbors(*end_row, *end_column) {
+            if grid[row][column] == next_value {
+                let mut extended_path = path.clone();
+                extended_path.push((row, column));
+                extended_paths.push(extended_path);
+            }
+        }
     }
 
-    frontier
-        .into_iter()
-        .filter(|(row, column)| grid[*row][*column] == b'9')
-        .count()
+    extended_paths
 }
 
 fn main() {
@@ -81,16 +76,27 @@ fn main() {
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
-    println!("running part {}", args.part);
-
     let grid = parse_padded_grid(reader.lines().map(Result::unwrap));
 
-    let mut sum = 0;
+    let mut score_sum = 0;
+    let mut rating_sum = 0;
     for row in 0..grid.len() {
         for column in 0..grid[row].len() {
-            sum += count_score(&grid, row, column);
+            if grid[row][column] == b'0' {
+                let mut paths = vec![vec![(row, column)]];
+                for _ in 0..9 {
+                    paths = extend(&grid, paths);
+                }
+
+                score_sum += paths
+                    .iter()
+                    .map(|path| *path.last().unwrap())
+                    .collect::<HashSet<_>>()
+                    .len();
+                rating_sum += paths.len();
+            }
         }
     }
 
-    println!("{sum}");
+    println!("{score_sum} {rating_sum}");
 }
