@@ -1,9 +1,6 @@
 #![warn(clippy::pedantic)]
 
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
+use std::io::{BufRead, BufReader};
 
 use clap::Parser;
 
@@ -70,41 +67,71 @@ fn defragment_blocks(blocks: &mut [u16]) {
     }
 }
 
-fn defragment_chunks(blocks: &mut [u16]) {
-    let mut id = *blocks.iter().rev().find(|b| **b != 0).unwrap();
-    while id != 0 {
-        let chunk_start = blocks.iter().position(|b| *b == id).unwrap();
-        let chunk_size = blocks[chunk_start..]
-            .iter()
-            .take_while(|b| **b == id)
-            .count();
+#[derive(Debug)]
+struct File {
+    id: u16,
+    start: usize,
+    length: usize,
+}
 
-        let mut destination = blocks.iter().position(|b| *b == 0);
-        while let Some(start) = destination {
-            let size = blocks[start..].iter().take_while(|b| **b == 0).count();
+impl File {
+    fn new(id: u16, start: usize, length: usize) -> Self {
+        Self { id, start, length }
+    }
+}
 
-            if size >= chunk_size {
+fn get_files(map: &[u8]) -> Vec<File> {
+    let mut id = 0u16;
+    let mut start = 0usize;
+    let mut mode = Mode::File;
+    let mut files = Vec::new();
+    for entry in map {
+        mode = match mode {
+            Mode::File => {
+                files.push(File::new(id, start, usize::from(*entry)));
+                start += usize::from(*entry);
+                id += 1;
+                Mode::Space
+            }
+            Mode::Space => {
+                start += usize::from(*entry);
+                Mode::File
+            }
+        };
+    }
+
+    files
+}
+
+fn defragment_chunks(mut files: Vec<File>) -> usize {
+    for id in (0..=files.last().unwrap().id).rev() {
+        let position = files.iter().position(|file| file.id == id).unwrap();
+        let file_length = files[position].length;
+        let mut gap = None;
+        for (index, window) in files[..=position].windows(2).enumerate() {
+            let gap_length = window[1].start - (window[0].start + window[0].length);
+            if gap_length >= file_length {
+                gap = Some(index + 1);
                 break;
             }
-
-            destination = blocks
-                .iter()
-                .skip(start + size)
-                .position(|b| *b == 0)
-                .map(|index| index + start + size);
         }
 
-        if let Some(start) = destination {
-            if start < chunk_start {
-                let mut temp = vec![0u16; chunk_size];
-                temp.swap_with_slice(&mut blocks[chunk_start..(chunk_start + chunk_size)]);
-                temp.swap_with_slice(&mut blocks[start..(start + chunk_size)]);
-                temp.swap_with_slice(&mut blocks[chunk_start..(chunk_start + chunk_size)]);
-            }
+        if let Some(gap) = gap {
+            let gap_start = files[gap - 1].start + files[gap - 1].length;
+            let mut file = files.remove(position);
+            file.start = gap_start;
+            files.insert(gap, file);
         }
-
-        id -= 1;
     }
+
+    files
+        .iter()
+        .map(|file| {
+            (file.start..(file.start + file.length))
+                .map(|location| location * usize::from(file.id))
+                .sum::<usize>()
+        })
+        .sum()
 }
 
 fn checksum(blocks: &[u16]) -> usize {
@@ -124,7 +151,7 @@ fn checksum(blocks: &[u16]) -> usize {
 fn main() {
     let args = Args::parse();
 
-    let file = File::open(args.filename).unwrap();
+    let file = std::fs::File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
 
     let map = reader
@@ -137,12 +164,12 @@ fn main() {
         .map(|b| *b - b'0')
         .collect::<Vec<_>>();
 
-    let mut blocks = expand(&map);
     if args.part == 1 {
+        let mut blocks = expand(&map);
         defragment_blocks(&mut blocks);
+        println!("{}", checksum(&blocks));
     } else {
-        defragment_chunks(&mut blocks);
+        let files = get_files(&map);
+        println!("{}", defragment_chunks(files));
     }
-
-    println!("{}", checksum(&blocks));
 }
