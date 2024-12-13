@@ -61,6 +61,19 @@ impl Machine {
             self.prize.y
         };
 
+        // We can compute this by solving a system of two equations for a_presses and b_presses:
+        // prize.x = a_presses * button_a.x + b_presses + button_b.x
+        // prize.y = a_presses * button_a.y + b_presses + button_b.y
+        //
+        // This gives:
+        //                prize.y * button_b.x - prize.x * button_b.y
+        // a_presses = -------------------------------------------------
+        //             button_a.y * button_b.x - button_a.x * button_b.y
+        //
+        //             prize.x - a_presses * button_a.x
+        // b_presses = --------------------------------
+        //                       button_b.x
+
         let numerator = prize_y * self.button_b.x - prize_x * self.button_b.y;
         let denominator = self.button_a.y * self.button_b.x - self.button_a.x * self.button_b.y;
         if numerator % denominator != 0 {
