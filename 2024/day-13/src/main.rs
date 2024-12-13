@@ -22,16 +22,16 @@ struct Args {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Vector {
-    x: u64,
-    y: u64,
+    x: i64,
+    y: i64,
 }
 
 impl Vector {
-    fn new(x: u64, y: u64) -> Self {
+    fn new(x: i64, y: i64) -> Self {
         Self { x, y }
     }
 
-    fn steps_to(&self, destination: &Self) -> Option<u64> {
+    fn steps_to(&self, destination: &Self) -> Option<i64> {
         if self.x > destination.x || self.y > destination.y {
             return None;
         }
@@ -67,10 +67,10 @@ impl PartialOrd for Vector {
     }
 }
 
-impl Mul<u64> for Vector {
+impl Mul<i64> for Vector {
     type Output = Self;
 
-    fn mul(self, rhs: u64) -> Self::Output {
+    fn mul(self, rhs: i64) -> Self::Output {
         Self::new(self.x * rhs, self.y * rhs)
     }
 }
@@ -99,21 +99,41 @@ impl Machine {
         }
     }
 
-    fn minimum_tokens(&self) -> u64 {
-        (0..=100)
-            .filter_map(|a_presses| {
-                let distance = self.button_a * a_presses;
-                if distance > self.prize {
-                    return None;
-                }
+    fn compute_minimum(&self, inflate: bool) -> i64 {
+        const INFLATION_AMOUNT: i64 = 10_000_000_000_000;
 
-                let remaining = self.prize - distance;
-                self.button_b
-                    .steps_to(&remaining)
-                    .map(|b_presses| a_presses * 3 + b_presses)
-            })
-            .min()
-            .unwrap_or(0)
+        let prize_x = if inflate {
+            self.prize.x + INFLATION_AMOUNT
+        } else {
+            self.prize.x
+        };
+
+        let prize_y = if inflate {
+            self.prize.y + INFLATION_AMOUNT
+        } else {
+            self.prize.y
+        };
+
+        let numerator = prize_y * self.button_b.x - prize_x * self.button_b.y;
+        let denominator = self.button_a.y * self.button_b.x - self.button_a.x * self.button_b.y;
+        if numerator % denominator != 0 {
+            return 0;
+        }
+
+        let a_presses = numerator / denominator;
+
+        let numerator = prize_x - a_presses * self.button_a.x;
+        if numerator % self.button_b.x != 0 {
+            return 0;
+        }
+
+        let b_presses = numerator / self.button_b.x;
+
+        if a_presses < 0 || b_presses < 0 {
+            return 0;
+        }
+
+        a_presses * 3 + b_presses
     }
 }
 
@@ -162,6 +182,9 @@ fn main() {
         machines.push(parse_machine(&mut lines, &button_regex, &prize_regex));
     }
 
-    let minimum_tokens: u64 = machines.iter().map(Machine::minimum_tokens).sum();
+    let minimum_tokens: i64 = machines
+        .iter()
+        .map(|machine| machine.compute_minimum(args.part == 2))
+        .sum();
     println!("{minimum_tokens}");
 }
