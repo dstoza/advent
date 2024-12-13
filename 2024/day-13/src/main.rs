@@ -1,10 +1,8 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    cmp::Ordering,
     fs::File,
     io::{BufRead, BufReader},
-    ops::{Mul, Sub},
 };
 
 use clap::Parser;
@@ -29,57 +27,6 @@ struct Vector {
 impl Vector {
     fn new(x: i64, y: i64) -> Self {
         Self { x, y }
-    }
-
-    fn steps_to(&self, destination: &Self) -> Option<i64> {
-        if self.x > destination.x || self.y > destination.y {
-            return None;
-        }
-
-        if destination.x % self.x != 0 || destination.y % self.y != 0 {
-            return None;
-        }
-
-        let x_steps = destination.x / self.x;
-        if self.y * x_steps == destination.y {
-            Some(x_steps)
-        } else {
-            None
-        }
-    }
-}
-
-impl Ord for Vector {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.x > other.x || self.y > other.y {
-            Ordering::Greater
-        } else if self.x == other.x && self.y == other.y {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    }
-}
-
-impl PartialOrd for Vector {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Mul<i64> for Vector {
-    type Output = Self;
-
-    fn mul(self, rhs: i64) -> Self::Output {
-        Self::new(self.x * rhs, self.y * rhs)
-    }
-}
-
-impl Sub<Vector> for Vector {
-    type Output = Self;
-
-    fn sub(self, rhs: Vector) -> Self::Output {
-        Self::new(self.x - rhs.x, self.y - rhs.y)
     }
 }
 
