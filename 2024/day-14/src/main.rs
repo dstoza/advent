@@ -4,11 +4,12 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     ops::{Add, Mul},
 };
 
 use clap::Parser;
+use flate2::{bufread::DeflateEncoder, Compression};
 use regex::Regex;
 
 #[derive(Parser)]
@@ -125,6 +126,40 @@ fn find_first_nonoverlapping(robots: &[Robot], width: i32, height: i32) -> i32 {
     steps
 }
 
+fn compute_entropy(positions: &HashSet<Vector>, width: i32, height: i32) -> usize {
+    let mut buffer = Vec::new();
+    for row in 0..height {
+        for column in 0..width {
+            if positions.contains(&Vector::new(column, row)) {
+                buffer.push(b'*');
+            } else {
+                buffer.push(b'.');
+            }
+        }
+    }
+
+    let reader = BufReader::new(buffer.as_slice());
+    let mut compressor = DeflateEncoder::new(reader, Compression::fast());
+    let mut output = Vec::new();
+    compressor.read_to_end(&mut output).unwrap();
+    output.len()
+}
+
+fn find_minimum_entropy(robots: &[Robot], width: i32, height: i32) -> i32 {
+    (0..width * height)
+        .map(|steps| {
+            let mut positions = HashSet::new();
+            for robot in robots {
+                let position = robot.position_after_steps(steps, width, height);
+                positions.insert(position);
+            }
+            (steps, compute_entropy(&positions, width, height))
+        })
+        .min_by_key(|(_steps, entropy)| *entropy)
+        .unwrap()
+        .0
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -153,5 +188,6 @@ fn main() {
     println!("{safety_factor}");
 
     let first_nonoverlapping = find_first_nonoverlapping(&robots, args.width, args.height);
-    println!("{first_nonoverlapping}");
+    let minimum_entropy = find_minimum_entropy(&robots, args.width, args.height);
+    println!("{first_nonoverlapping} {minimum_entropy}");
 }
