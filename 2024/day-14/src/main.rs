@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic)]
+#![allow(clippy::cast_sign_loss)]
 
 use std::{
     cmp::Ordering,
@@ -126,18 +127,30 @@ fn find_first_nonoverlapping(robots: &[Robot], width: i32, height: i32) -> i32 {
     steps
 }
 
-fn compute_entropy(positions: &HashSet<Vector>, width: i32, height: i32) -> usize {
-    let mut buffer = Vec::new();
-    for row in 0..height {
-        for column in 0..width {
-            if positions.contains(&Vector::new(column, row)) {
-                buffer.push(b'*');
-            } else {
-                buffer.push(b'.');
-            }
+struct OccupancyGrid {
+    width: usize,
+    grid: Vec<u8>,
+}
+
+impl OccupancyGrid {
+    fn new(width: i32, height: i32) -> Self {
+        Self {
+            width: width as usize,
+            grid: vec![u8::from(false); (width * height) as usize],
         }
     }
 
+    fn set(&mut self, position: Vector) {
+        self.grid[position.y as usize * self.width + position.x as usize] = u8::from(true);
+    }
+
+    fn into_buffer(self) -> Vec<u8> {
+        self.grid
+    }
+}
+
+fn compute_entropy(positions: OccupancyGrid) -> usize {
+    let buffer = positions.into_buffer();
     let reader = BufReader::new(buffer.as_slice());
     let mut compressor = DeflateEncoder::new(reader, Compression::fast());
     let mut output = Vec::new();
@@ -148,12 +161,12 @@ fn compute_entropy(positions: &HashSet<Vector>, width: i32, height: i32) -> usiz
 fn find_minimum_entropy(robots: &[Robot], width: i32, height: i32) -> i32 {
     (0..width * height)
         .map(|steps| {
-            let mut positions = HashSet::new();
+            let mut positions = OccupancyGrid::new(width, height);
             for robot in robots {
                 let position = robot.position_after_steps(steps, width, height);
-                positions.insert(position);
+                positions.set(position);
             }
-            (steps, compute_entropy(&positions, width, height))
+            (steps, compute_entropy(positions))
         })
         .min_by_key(|(_steps, entropy)| *entropy)
         .unwrap()
