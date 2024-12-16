@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -10,10 +10,6 @@ use clap::Parser;
 
 #[derive(Parser)]
 struct Args {
-    /// Part of the problem to run
-    #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=2))]
-    part: u8,
-
     /// File to open
     filename: String,
 }
@@ -29,6 +25,29 @@ enum Direction {
 impl Direction {
     fn all() -> [Self; 4] {
         [Self::North, Self::East, Self::South, Self::West]
+    }
+
+    fn turns_to(self, other: Self) -> usize {
+        match (self, other) {
+            (Self::North, Self::North)
+            | (Self::East, Self::East)
+            | (Self::South, Self::South)
+            | (Self::West, Self::West) => 0,
+            (Self::North, Self::South)
+            | (Self::East, Self::West)
+            | (Self::South, Self::North)
+            | (Self::West, Self::East) => 2,
+            _ => 1,
+        }
+    }
+
+    fn opposite(self) -> Self {
+        match self {
+            Self::North => Self::South,
+            Self::East => Self::West,
+            Self::South => Self::North,
+            Self::West => Self::East,
+        }
     }
 }
 
@@ -53,90 +72,33 @@ impl Vector {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Step {
-    position: Vector,
-    direction: Direction,
-    visited: Vec<Vector>,
-    cost: usize,
-}
-
-impl Step {
-    fn new(position: Vector, direction: Direction) -> Self {
-        Self {
-            position,
-            direction,
-            visited: Vec::new(),
-            cost: 0,
-        }
-    }
-}
-
-impl PartialOrd for Step {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Step {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cost.cmp(&self.cost)
-    }
-}
-
-fn shortest_path(
+fn all_shortest_paths(
     grid: &[Vec<u8>],
     start: Vector,
     start_direction: Direction,
-    end: Vector,
-    end_direction: Direction,
-) -> Option<usize> {
-    let mut shortest = None;
-    let mut best_to_cell = HashMap::new();
-    let mut queue = BinaryHeap::from([Step::new(start, start_direction)]);
-    while let Some(step) = queue.pop() {
-        if let Some(best) = best_to_cell.get(&step.position) {
-            if *best < step.cost {
-                continue;
-            }
-        } else {
-            best_to_cell.insert(step.position, step.cost);
-        }
+) -> Vec<Vec<Vec<usize>>> {
+    let mut costs = vec![vec![vec![usize::MAX; Direction::all().len()]; grid[0].len()]; grid.len()];
+    costs[start.row][start.column][start_direction as usize] = 0;
 
-        if step.position == end && step.direction == end_direction {
-            shortest = shortest
-                .map(|minimum: usize| minimum.min(step.cost))
-                .or(Some(step.cost));
-
-            continue;
-        }
-
-        if let Some(minimum) = shortest {
-            if step.cost > minimum {
-                continue;
-            }
-        }
-
-        for (direction, neighbor) in step.position.neighbors() {
-            if step.visited.iter().any(|visited| *visited == neighbor) {
+    let mut queue = VecDeque::from([(start, start_direction)]);
+    while let Some((position, direction)) = queue.pop_front() {
+        let cost = costs[position.row][position.column][direction as usize];
+        for (neighbor_direction, neighbor) in position.neighbors() {
+            if grid[neighbor.row][neighbor.column] == b'#' {
                 continue;
             }
 
-            let cell = grid[neighbor.row][neighbor.column];
-            if cell != b'.' && cell != b'E' {
-                continue;
+            let cost_to_neighbor = cost + 1 + 1000 * direction.turns_to(neighbor_direction);
+            if costs[neighbor.row][neighbor.column][neighbor_direction as usize] > cost_to_neighbor
+            {
+                costs[neighbor.row][neighbor.column][neighbor_direction as usize] =
+                    cost_to_neighbor;
+                queue.push_back((neighbor, neighbor_direction));
             }
-
-            let mut next_step = step.clone();
-            next_step.cost += if direction == step.direction { 1 } else { 1001 };
-            next_step.visited.push(step.position);
-            next_step.position = neighbor;
-            next_step.direction = direction;
-            queue.push(next_step);
         }
     }
 
-    shortest
+    costs
 }
 
 fn main() {
@@ -144,8 +106,6 @@ fn main() {
 
     let file = File::open(args.filename).unwrap();
     let reader = BufReader::new(file);
-
-    println!("running part {}", args.part);
 
     let grid = reader
         .lines()
@@ -167,54 +127,51 @@ fn main() {
     let start = start.unwrap();
     let end = end.unwrap();
 
-    let mut shortest: Option<usize> = None;
-    for direction in Direction::all() {
-        let length = shortest_path(&grid, start, Direction::East, end, direction);
-        if let Some(length) = length {
-            shortest = shortest.map_or(Some(length), |shortest| Some(shortest.min(length)));
-        }
-    }
+    let paths_from_start = all_shortest_paths(&grid, start, Direction::East);
+    let shortest = *paths_from_start[end.row][end.column].iter().min().unwrap();
 
-    let shortest = shortest.unwrap();
+    println!("{shortest}");
 
-    let mut middles = Vec::new();
-    for (row, line) in grid.iter().enumerate() {
-        for (column, cell) in line.iter().enumerate() {
-            if *cell == b'.' {
-                middles.push(Vector::new(row, column));
+    let end_direction = Direction::all()
+        .map(|direction| {
+            (
+                direction,
+                paths_from_start[end.row][end.column][direction as usize],
+            )
+        })
+        .into_iter()
+        .min_by_key(|(_direction, cost)| *cost)
+        .unwrap()
+        .0
+        .opposite();
+
+    let paths_from_end = all_shortest_paths(&grid, end, end_direction);
+
+    let mut intersections = HashSet::new();
+
+    for row in 0..grid.len() {
+        for column in 0..grid[0].len() {
+            if grid[row][column] != b'.' {
+                continue;
             }
-        }
-    }
 
-    let mut count = 2;
-    for middle in middles {
-        println!("{middle:?}");
-        if Direction::all().iter().any(|middle_direction| {
-            let Some(first) =
-                shortest_path(&grid, start, Direction::East, middle, *middle_direction)
-            else {
-                return false;
-            };
+            for to_direction in Direction::all() {
+                for from_direction in Direction::all() {
+                    let cost_to = paths_from_start[row][column][to_direction as usize];
+                    let cost_from = paths_from_end[row][column][from_direction as usize];
+                    if cost_to == usize::MAX || cost_from == usize::MAX {
+                        continue;
+                    }
 
-            let mut second: Option<usize> = None;
-            for end_direction in Direction::all() {
-                if let Some(length) =
-                    shortest_path(&grid, middle, *middle_direction, end, end_direction)
-                {
-                    second = second.map_or(Some(length), |best| Some(best.min(length)));
+                    if cost_to + cost_from + 1000 * to_direction.turns_to(from_direction.opposite())
+                        == shortest
+                    {
+                        intersections.insert(Vector::new(row, column));
+                    }
                 }
             }
-
-            let Some(second) = second else {
-                return false;
-            };
-
-            first + second == shortest
-        }) {
-            println!("{middle:?}");
-            count += 1;
         }
     }
 
-    println!("count {count}");
+    println!("{}", intersections.len() + 2);
 }
