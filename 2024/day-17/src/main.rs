@@ -14,6 +14,10 @@ struct Args {
     #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=2))]
     part: u8,
 
+    /// Override initial value of A register
+    #[arg(short, long)]
+    a: Option<i64>,
+
     /// File to open
     filename: String,
 }
@@ -65,7 +69,10 @@ fn main() {
 
     let mut lines = reader.lines().map(Result::unwrap);
 
-    let mut register_file = RegisterFile::<i32>::parse(&mut lines);
+    let mut register_file = RegisterFile::<i64>::parse(&mut lines);
+    if let Some(a) = args.a {
+        register_file.a = a;
+    }
 
     let program = lines
         .nth(1)
@@ -89,7 +96,7 @@ fn main() {
             }
             1 => {
                 // bxl
-                register_file.b ^= i32::from(program[ip + 1]);
+                register_file.b ^= i64::from(program[ip + 1]);
                 ip += 2;
             }
             2 => {
