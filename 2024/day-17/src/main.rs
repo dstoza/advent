@@ -1,5 +1,5 @@
 #![warn(clippy::pedantic)]
-#![allow(clippy::match_on_vec_items)]
+#![allow(clippy::cast_sign_loss, clippy::match_on_vec_items)]
 
 use std::{
     fs::File,
@@ -23,6 +23,7 @@ struct Args {
     filename: String,
 }
 
+#[derive(Clone)]
 struct RegisterFile<T> {
     a: T,
     b: T,
@@ -62,29 +63,7 @@ where
     }
 }
 
-fn main() {
-    let args = Args::parse();
-
-    let file = File::open(args.filename).unwrap();
-    let reader = BufReader::new(file);
-
-    let mut lines = reader.lines().map(Result::unwrap);
-
-    let mut register_file = RegisterFile::<i64>::parse(&mut lines);
-    if let Some(a) = args.a {
-        register_file.a = a;
-    }
-
-    let program = lines
-        .nth(1)
-        .unwrap()
-        .split(": ")
-        .nth(1)
-        .unwrap()
-        .split(',')
-        .map(|position| position.parse().unwrap())
-        .collect::<Vec<u8>>();
-
+fn simulate(program: &[u8], mut register_file: RegisterFile<i64>) -> Vec<u8> {
     let mut output = Vec::new();
 
     let mut ip = 0;
@@ -120,7 +99,7 @@ fn main() {
             }
             5 => {
                 // out
-                output.push(register_file.load_combo(program[ip + 1]) % 8);
+                output.push((register_file.load_combo(program[ip + 1]) % 8) as u8);
                 ip += 2;
             }
             6 => {
@@ -137,5 +116,62 @@ fn main() {
         }
     }
 
+    output
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let file = File::open(args.filename).unwrap();
+    let reader = BufReader::new(file);
+
+    let mut lines = reader.lines().map(Result::unwrap);
+
+    let mut register_file = RegisterFile::<i64>::parse(&mut lines);
+    if let Some(a) = args.a {
+        register_file.a = a;
+    }
+
+    let program = lines
+        .nth(1)
+        .unwrap()
+        .split(": ")
+        .nth(1)
+        .unwrap()
+        .split(',')
+        .map(|position| position.parse().unwrap())
+        .collect::<Vec<u8>>();
+
+    let output = simulate(&program, register_file.clone());
     println!("{output:?}");
+
+    // Warning: this code may not generalize.
+    //
+    // It is based on the observation that our particular input does ~some stuff~ with
+    // the A register, then divides the A register by 8 and loops until A == 0.
+    //
+    // Therefore, this code builds the program up backwards, incrementing the initial value
+    // until the current digit is correct, then multiplying by 8 and moving on to
+    // the next earlier digit.
+
+    let mut initial = 0;
+    let mut current_digit = program.len() - 1;
+    loop {
+        let mut register_file = register_file.clone();
+        register_file.a = initial;
+
+        let output = simulate(&program, register_file);
+        if output == program[current_digit..] {
+            if current_digit > 0 {
+                current_digit -= 1;
+                initial *= 8;
+            } else {
+                break;
+            }
+        } else {
+            initial += 1;
+        }
+    }
+
+    println!("{initial}");
 }
