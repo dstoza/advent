@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic)]
+#![allow(clippy::match_on_vec_items)]
 
 use std::{
     fs::File,
