@@ -18,24 +18,27 @@ struct Args {
     filename: String,
 }
 
-fn is_possible(design: &str, patterns: &[String], cache: &mut HashMap<String, bool>) -> bool {
+fn possible_arrangements(
+    design: &str,
+    patterns: &[String],
+    cache: &mut HashMap<String, usize>,
+) -> usize {
     if design.is_empty() {
-        return true;
+        return 1;
     }
 
     if let Some(cached) = cache.get(design) {
         return *cached;
     }
 
-    for pattern in patterns {
-        if design.starts_with(pattern) && is_possible(&design[pattern.len()..], patterns, cache) {
-            cache.insert(design.to_owned(), true);
-            return true;
-        }
-    }
+    let arrangements = patterns
+        .iter()
+        .filter(|pattern| design.starts_with(*pattern))
+        .map(|pattern| possible_arrangements(&design[pattern.len()..], patterns, cache))
+        .sum();
 
-    cache.insert(design.to_owned(), false);
-    false
+    cache.insert(design.to_owned(), arrangements);
+    arrangements
 }
 
 fn main() {
@@ -54,10 +57,17 @@ fn main() {
 
     let mut cache = HashMap::new();
 
-    let possible = lines
+    let possible: usize = lines
         .skip(1)
-        .filter(|design| is_possible(design, &patterns, &mut cache))
-        .count();
+        .map(|design| {
+            let arrangements = possible_arrangements(&design, &patterns, &mut cache);
+            if args.part == 1 {
+                usize::from(arrangements > 0)
+            } else {
+                arrangements
+            }
+        })
+        .sum();
 
     println!("{possible}");
 }
