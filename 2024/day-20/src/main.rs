@@ -1,5 +1,9 @@
 #![warn(clippy::pedantic)]
-#![allow(clippy::cast_possible_truncation)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -47,7 +51,7 @@ impl Position {
                 }
 
                 let distance = row.abs_diff(self.row) + column.abs_diff(self.column);
-                neighbors.push((distance, Self::new(row, column)))
+                neighbors.push((distance, Self::new(row, column)));
             }
         }
 
@@ -133,8 +137,8 @@ fn main() {
 
     let count = cheats
         .iter()
-        .map(|(skipped, count)| {
-            if *skipped >= args.filter_distance {
+        .map(|(skip_distance, count)| {
+            if *skip_distance >= args.filter_distance {
                 *count
             } else {
                 0
@@ -143,13 +147,4 @@ fn main() {
         .sum::<usize>();
 
     println!("{count}");
-
-    // let mut cheat_counts = cheats
-    //     .iter()
-    //     .map(|(skipped, count)| (*skipped, *count))
-    //     .collect::<Vec<_>>();
-    // cheat_counts.sort_unstable_by_key(|(skipped, _)| *skipped);
-    // for count in cheat_counts {
-    //     println!("{count:?}");
-    // }
 }
