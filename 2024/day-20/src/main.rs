@@ -110,23 +110,23 @@ fn main() {
         }
     }
 
-    let steps = path
-        .iter()
-        .enumerate()
-        .map(|(index, position)| (*position, index))
-        .collect::<HashMap<_, _>>();
+    let mut steps = vec![vec![0; grid[0].len()]; grid.len()];
+    for (index, position) in path.iter().enumerate() {
+        steps[position.row][position.column] = index;
+    }
 
     let mut cheats = HashMap::new();
 
     for step in path {
-        let from_time = *steps.get(&step).unwrap();
+        let from_time = steps[step.row][step.column];
         for (distance, target) in step.neighbors(args.max_distance, width, height) {
-            let Some(target_time) = steps.get(&target) else {
+            let target_time = steps[target.row][target.column];
+            if target_time == 0 {
                 continue;
-            };
+            }
 
-            if *target_time > from_time + distance {
-                let skipped = *target_time - from_time - distance;
+            if target_time > from_time + distance {
+                let skipped = target_time - from_time - distance;
                 cheats
                     .entry(skipped)
                     .and_modify(|count| *count += 1)
