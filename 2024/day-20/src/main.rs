@@ -126,9 +126,9 @@ fn main() {
             }
 
             if target_time > from_time + distance {
-                let skipped = target_time - from_time - distance;
+                let skip_distance = target_time - from_time - distance;
                 cheats
-                    .entry(skipped)
+                    .entry(skip_distance)
                     .and_modify(|count| *count += 1)
                     .or_insert(1usize);
             }
