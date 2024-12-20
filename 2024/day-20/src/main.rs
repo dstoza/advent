@@ -11,9 +11,11 @@ use clap::Parser;
 
 #[derive(Parser)]
 struct Args {
-    /// Part of the problem to run
-    #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=2))]
-    part: u8,
+    #[arg(short, long)]
+    max_distance: usize,
+
+    #[arg(short, long, default_value_t = 0)]
+    filter_distance: usize,
 
     /// File to open
     filename: String,
@@ -30,44 +32,26 @@ impl Position {
         Self { row, column }
     }
 
-    fn neighbors(self) -> [Self; 4] {
-        [
-            Self::new(self.row + 1, self.column),
-            Self::new(self.row - 1, self.column),
-            Self::new(self.row, self.column + 1),
-            Self::new(self.row, self.column - 1),
-        ]
-    }
+    fn neighbors(self, max_distance: usize, width: usize, height: usize) -> Vec<(usize, Self)> {
+        let min_row = ((self.row as isize) - max_distance as isize).max(0) as usize;
+        let max_row = (self.row + max_distance).min(height - 1);
 
-    fn jumps(self, width: usize, height: usize) -> Vec<[Self; 2]> {
-        let mut jumps = Vec::new();
+        let mut neighbors = Vec::new();
+        for row in min_row..=max_row {
+            let remaining_distance = max_distance - row.abs_diff(self.row);
+            let min_column = ((self.column as isize) - remaining_distance as isize).max(0) as usize;
+            let max_column = (self.column + remaining_distance).min(width - 1);
+            for column in min_column..=max_column {
+                if row == self.row && column == self.column {
+                    continue;
+                }
 
-        if self.row > 1 {
-            jumps.push([
-                Self::new(self.row - 1, self.column),
-                Self::new(self.row - 2, self.column),
-            ]);
-        }
-        if self.row < height - 2 {
-            jumps.push([
-                Self::new(self.row + 1, self.column),
-                Self::new(self.row + 2, self.column),
-            ]);
-        }
-        if self.column > 1 {
-            jumps.push([
-                Self::new(self.row, self.column - 1),
-                Self::new(self.row, self.column - 2),
-            ]);
-        }
-        if self.column < width - 2 {
-            jumps.push([
-                Self::new(self.row, self.column + 1),
-                Self::new(self.row, self.column + 2),
-            ]);
+                let distance = row.abs_diff(self.row) + column.abs_diff(self.column);
+                neighbors.push((distance, Self::new(row, column)))
+            }
         }
 
-        jumps
+        neighbors
     }
 }
 
@@ -111,7 +95,7 @@ fn main() {
             break;
         }
 
-        for neighbor in current.neighbors() {
+        for (_, neighbor) in current.neighbors(1, width, height) {
             if path.iter().any(|previous| *previous == neighbor) {
                 continue;
             }
@@ -132,17 +116,13 @@ fn main() {
 
     for step in path {
         let from_time = *steps.get(&step).unwrap();
-        for jumps in step.jumps(width, height) {
-            if steps.contains_key(&jumps[0]) {
-                continue;
-            }
-
-            let Some(destination) = steps.get(&jumps[1]) else {
+        for (distance, target) in step.neighbors(args.max_distance, width, height) {
+            let Some(target_time) = steps.get(&target) else {
                 continue;
             };
 
-            if *destination > from_time {
-                let skipped = *destination - from_time - 2;
+            if *target_time > from_time + distance {
+                let skipped = *target_time - from_time - distance;
                 cheats
                     .entry(skipped)
                     .and_modify(|count| *count += 1)
@@ -153,7 +133,13 @@ fn main() {
 
     let count = cheats
         .iter()
-        .map(|(skipped, count)| if *skipped >= 100 { *count } else { 0 })
+        .map(|(skipped, count)| {
+            if *skipped >= args.filter_distance {
+                *count
+            } else {
+                0
+            }
+        })
         .sum::<usize>();
 
     println!("{count}");
