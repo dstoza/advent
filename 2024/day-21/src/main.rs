@@ -18,6 +18,7 @@ struct Args {
     filename: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Position {
     row: usize,
     column: usize,
@@ -70,6 +71,48 @@ fn direction_string(directions: &[Direction]) -> String {
         .collect::<String>()
 }
 
+fn all_shortest(keypad: &[&[u8]], start: Position, end: Position) -> Vec<Vec<Direction>> {
+    let mut all_directions = Vec::new();
+    let mut shortest = None;
+    let mut queue = VecDeque::from([(vec![start], vec![])]);
+    while let Some((path, directions)) = queue.pop_front() {
+        if let Some(shortest) = shortest {
+            if path.len() > shortest {
+                continue;
+            }
+        }
+
+        if *path.last().unwrap() == end {
+            shortest =
+                shortest.map_or_else(|| Some(path.len()), |current| Some(current.min(path.len())));
+            all_directions.push(directions);
+            continue;
+        }
+
+        for (direction, neighbor) in path
+            .last()
+            .unwrap()
+            .neighbors(keypad[0].len(), keypad.len())
+        {
+            if path.iter().any(|previous| *previous == neighbor) {
+                continue;
+            }
+
+            if keypad[neighbor.row][neighbor.column] == b'.' {
+                continue;
+            }
+
+            let mut next_path = path.clone();
+            next_path.push(neighbor);
+            let mut next_directions = directions.clone();
+            next_directions.push(direction);
+            queue.push_back((next_path, next_directions));
+        }
+    }
+
+    all_directions
+}
+
 fn get_directions(mut string: String, paths: &HashMap<(u8, u8), Vec<Direction>>) -> String {
     string.insert(0, 'A');
     let mut directions = Vec::new();
@@ -81,76 +124,25 @@ fn get_directions(mut string: String, paths: &HashMap<(u8, u8), Vec<Direction>>)
     direction_string(&directions)
 }
 
-fn path_cost(path: &[Direction], directional_paths: &HashMap<(u8, u8), Vec<Direction>>) -> usize {
-    let string = direction_string(path);
-    let mut string = get_directions(string, directional_paths);
-    string.insert(0, 'A');
-    string
-        .as_bytes()
-        .windows(2)
-        .map(|window| {
-            directional_paths
-                .get(&(window[0], window[1]))
-                .unwrap()
-                .len()
+fn shortest_expanded(
+    keypad: &[&[u8]],
+    start: Position,
+    end: Position,
+    directional_paths: &HashMap<(u8, u8), Vec<Direction>>,
+) -> usize {
+    all_shortest(keypad, start, end)
+        .into_iter()
+        .map(|path| {
+            let mut expanded = direction_string(&path);
+            expanded.push('A');
+            let expanded = get_directions(expanded, directional_paths);
+            let expanded = get_directions(expanded, directional_paths);
+
+            (path.clone(), expanded.len())
         })
-        .sum()
-}
-
-fn paths(
-    keypad: &[&[u8]],
-    start_row: usize,
-    start_column: usize,
-    directional_paths: &HashMap<(u8, u8), Vec<Direction>>,
-) -> HashMap<u8, Vec<Direction>> {
-    let mut paths: HashMap<u8, Vec<Direction>> = HashMap::new();
-
-    let mut queue = VecDeque::from([(Position::new(start_row, start_column), Vec::new())]);
-    while let Some((position, path)) = queue.pop_front() {
-        let value = keypad[position.row][position.column];
-        let cost = path_cost(&path, directional_paths);
-        if let Some(path) = paths.get(&value) {
-            if path_cost(path, directional_paths) <= cost {
-                continue;
-            }
-        }
-
-        paths.insert(value, path.clone());
-
-        for (direction, neighbor) in position.neighbors(keypad[0].len(), keypad.len()) {
-            if keypad[neighbor.row][neighbor.column] == b'.' {
-                continue;
-            }
-
-            let mut path_to_neighbor = path.clone();
-            path_to_neighbor.push(direction);
-            queue.push_back((neighbor, path_to_neighbor));
-        }
-    }
-
-    paths
-}
-
-fn all_paths(
-    keypad: &[&[u8]],
-    directional_paths: &HashMap<(u8, u8), Vec<Direction>>,
-) -> HashMap<(u8, u8), Vec<Direction>> {
-    let mut all_paths = HashMap::new();
-
-    for (row, line) in keypad.iter().enumerate() {
-        for (column, value) in line.iter().enumerate() {
-            if *value == b'.' {
-                continue;
-            }
-
-            let paths_for_value = paths(keypad, row, column, directional_paths);
-            for (destination, path) in paths_for_value {
-                all_paths.insert((*value, destination), path);
-            }
-        }
-    }
-
-    all_paths
+        .min_by_key(|(_path, length)| *length)
+        .unwrap()
+        .1
 }
 
 fn main() {
@@ -200,28 +192,29 @@ fn main() {
         ((b'>', b'>'), vec![]),
     ]);
 
-    let numeric_paths = all_paths(&NUMERIC, &directional_paths);
-
-    for ((from, to), directions) in &directional_paths {
-        println!("{} {} {directions:?}", *from as char, *to as char);
+    let mut positions = HashMap::new();
+    for (row, line) in NUMERIC.iter().enumerate() {
+        for (column, value) in line.iter().enumerate() {
+            positions.insert(*value, Position::new(row, column));
+        }
     }
 
     let mut sum = 0;
     for mut code in reader.lines().map(Result::unwrap) {
         let numeric_value = code.strip_suffix('A').unwrap().parse::<usize>().unwrap();
-        println!("{code} {numeric_value}");
-        let directions = get_directions(code, &numeric_paths);
-        println!("{directions}");
-        let directions = get_directions(directions, &directional_paths);
-        println!("{directions}");
-        let directions = get_directions(directions, &directional_paths);
-        println!("{directions}");
-        let complexity = numeric_value * directions.len();
-        println!("{} {complexity}", directions.len());
-        sum += complexity;
-    }
+        let mut length = 0;
+        code.insert(0, 'A');
+        for pair in code.as_bytes().windows(2) {
+            length += shortest_expanded(
+                &NUMERIC,
+                *positions.get(&pair[0]).unwrap(),
+                *positions.get(&pair[1]).unwrap(),
+                &directional_paths,
+            );
+        }
 
-    // 237348 too high
+        sum += numeric_value * length;
+    }
 
     println!("{sum}");
 }
