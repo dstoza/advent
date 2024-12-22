@@ -10,9 +10,9 @@ use clap::Parser;
 
 #[derive(Parser)]
 struct Args {
-    /// Part of the problem to run
-    #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=2))]
-    part: u8,
+    /// Number of robots using keypads
+    #[arg(short, long)]
+    robots: usize,
 
     /// File to open
     filename: String,
@@ -113,36 +113,75 @@ fn all_shortest(keypad: &[&[u8]], start: Position, end: Position) -> Vec<Vec<Dir
     all_directions
 }
 
-fn get_directions(mut string: String, paths: &HashMap<(u8, u8), Vec<Direction>>) -> String {
-    string.insert(0, 'A');
-    let mut directions = Vec::new();
-    for pair in string.as_bytes().windows(2) {
-        directions.extend_from_slice(paths.get(&(pair[0], pair[1])).unwrap());
+fn get_directions(
+    first: u8,
+    pairs: HashMap<(u8, u8), usize>,
+    paths: &HashMap<(u8, u8), Vec<Direction>>,
+) -> (u8, HashMap<(u8, u8), usize>) {
+    let mut expanded = HashMap::new();
+
+    let first = {
+        let mut directions = paths.get(&(b'A', first)).unwrap().to_owned();
         directions.push(Direction::Activate);
+        let directions = direction_string(&directions);
+        let first = directions.as_bytes()[0];
+        for pair in directions.as_bytes().windows(2) {
+            expanded
+                .entry((pair[0], pair[1]))
+                .and_modify(|count| *count += 1)
+                .or_insert(1usize);
+        }
+
+        first
+    };
+
+    for (pair, count) in pairs {
+        let mut directions = paths.get(&pair).unwrap().to_owned();
+        directions.push(Direction::Activate);
+        let mut directions = direction_string(&directions);
+        directions.insert(0, 'A');
+        for pair in directions.as_bytes().windows(2) {
+            expanded
+                .entry((pair[0], pair[1]))
+                .and_modify(|c| *c += count)
+                .or_insert(count);
+        }
     }
 
-    direction_string(&directions)
+    (first, expanded)
 }
 
 fn shortest_expanded(
     keypad: &[&[u8]],
     start: Position,
     end: Position,
+    robots: usize,
     directional_paths: &HashMap<(u8, u8), Vec<Direction>>,
 ) -> usize {
     all_shortest(keypad, start, end)
         .into_iter()
-        .map(|path| {
-            let mut expanded = direction_string(&path);
-            expanded.push('A');
-            let expanded = get_directions(expanded, directional_paths);
-            let expanded = get_directions(expanded, directional_paths);
+        .map(|mut path| {
+            path.push(Direction::Activate);
 
-            (path.clone(), expanded.len())
+            let expanded_str = direction_string(&path);
+
+            let mut expanded = HashMap::new();
+            for pair in expanded_str.as_bytes().windows(2) {
+                expanded
+                    .entry((pair[0], pair[1]))
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
+            }
+
+            let mut first = *expanded_str.as_bytes().first().unwrap();
+            for _ in 0..robots {
+                (first, expanded) = get_directions(first, expanded, directional_paths);
+            }
+
+            expanded.values().sum::<usize>() + 1
         })
-        .min_by_key(|(_path, length)| *length)
+        .min()
         .unwrap()
-        .1
 }
 
 fn main() {
@@ -170,7 +209,7 @@ fn main() {
             (b'A', b'<'),
             vec![Direction::Down, Direction::Left, Direction::Left],
         ),
-        ((b'A', b'v'), vec![Direction::Down, Direction::Left]),
+        ((b'A', b'v'), vec![Direction::Left, Direction::Down]),
         ((b'A', b'>'), vec![Direction::Down]),
         ((b'<', b'^'), vec![Direction::Right, Direction::Up]),
         (
@@ -209,6 +248,7 @@ fn main() {
                 &NUMERIC,
                 *positions.get(&pair[0]).unwrap(),
                 *positions.get(&pair[1]).unwrap(),
+                args.robots,
                 &directional_paths,
             );
         }
